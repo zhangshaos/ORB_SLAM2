@@ -92,6 +92,24 @@ std::string strToUpper(const std::string& s)
   return ret;
 }
 
+  // copied from https://stackoverflow.com/questions/40159892/using-asprintf-on-windows
+  int vasprintf(char **strp, const char *format, va_list ap)
+  {
+    int len = _vscprintf(format, ap);
+    if (len == -1)
+      return -1;
+    char *str = (char*)malloc((size_t) len + 1);
+    if (!str)
+      return -1;
+    int retval = vsnprintf(str, len + 1, format, ap);
+    if (retval == -1) {
+      free(str);
+      return -1;
+    }
+    *strp = str;
+    return retval;
+  }
+
 std::string formatString(const char* fmt, ...)
 {
   char* auxPtr = NULL;

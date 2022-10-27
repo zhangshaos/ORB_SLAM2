@@ -1,14 +1,34 @@
-# ORB-SLAM2 超详细注释
-
--by 计算机视觉life 公众号旗下开源学习小组：SLAM研习社
-
-
-独家课程《ORB-SLAM2精讲：原理推导+逐行代码分析》！ [点击查看官网](https://cvlife.net/)
-
-课程大纲如下：
-![大纲](https://github.com/electech6/ORB_SLAM2_detailed_comments/blob/master/outline.png)
-
-----
+toc
+- [ORB-SLAM2](#orb-slam2)
+    - [Related Publications:](#related-publications)
+- [1. License](#1-license)
+- [2. Prerequisites](#2-prerequisites)
+  - [C++11 or C++0x Compiler](#c11-or-c0x-compiler)
+  - [Pangolin](#pangolin)
+  - [OpenCV](#opencv)
+  - [Eigen3](#eigen3)
+  - [DBoW2 and g2o (Included in Thirdparty folder)](#dbow2-and-g2o-included-in-thirdparty-folder)
+  - [ROS (optional)](#ros-optional)
+- [3. Building ORB-SLAM2 library and examples](#3-building-orb-slam2-library-and-examples)
+- [4. Monocular Examples](#4-monocular-examples)
+  - [TUM Dataset](#tum-dataset)
+  - [KITTI Dataset](#kitti-dataset)
+  - [EuRoC Dataset](#euroc-dataset)
+- [5. Stereo Examples](#5-stereo-examples)
+  - [KITTI Dataset](#kitti-dataset-1)
+  - [EuRoC Dataset](#euroc-dataset-1)
+- [6. RGB-D Example](#6-rgb-d-example)
+  - [TUM Dataset](#tum-dataset-1)
+- [7. ROS Examples](#7-ros-examples)
+    - [Building the nodes for mono, monoAR, stereo and RGB-D](#building-the-nodes-for-mono-monoar-stereo-and-rgb-d)
+    - [Running Monocular Node](#running-monocular-node)
+    - [Running Monocular Augmented Reality Demo](#running-monocular-augmented-reality-demo)
+    - [Running Stereo Node](#running-stereo-node)
+    - [Running RGB_D Node](#running-rgb_d-node)
+- [8. Processing your own sequences](#8-processing-your-own-sequences)
+- [9. SLAM and Localization Modes](#9-slam-and-localization-modes)
+    - [SLAM Mode](#slam-mode)
+    - [Localization Mode](#localization-mode)
 
 
 # ORB-SLAM2

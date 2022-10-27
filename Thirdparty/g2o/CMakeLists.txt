@@ -1,5 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
-SET(CMAKE_LEGACY_CYGWIN_WIN32 0)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
 
 PROJECT(g2o)
 
@@ -7,13 +6,14 @@ SET(g2o_C_FLAGS)
 SET(g2o_CXX_FLAGS)
 
 # default built type
-IF(NOT CMAKE_BUILD_TYPE)
-  SET(CMAKE_BUILD_TYPE Release)
-ENDIF()
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
 MESSAGE(STATUS "BUILD TYPE:" ${CMAKE_BUILD_TYPE})
 
-SET (G2O_LIB_TYPE SHARED)
+SET(G2O_LIB_TYPE STATIC)
+set(CMAKE_CXX_STANDARD 11)
 
 # There seems to be an issue with MSVC8
 # see http://eigen.tuxfamily.org/bz/show_bug.cgi?id=83
@@ -23,11 +23,7 @@ if(MSVC90)
 endif(MSVC90)
 
 # Set the output directory for the build executables and libraries
-IF(WIN32)
-  SET(g2o_LIBRARY_OUTPUT_DIRECTORY ${g2o_SOURCE_DIR}/bin CACHE PATH "Target for the libraries")
-ELSE(WIN32)
-  SET(g2o_LIBRARY_OUTPUT_DIRECTORY ${g2o_SOURCE_DIR}/lib CACHE PATH "Target for the libraries")
-ENDIF(WIN32)
+SET(g2o_LIBRARY_OUTPUT_DIRECTORY ${g2o_SOURCE_DIR}/lib CACHE PATH "Target for the libraries")
 SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${g2o_LIBRARY_OUTPUT_DIRECTORY})
 SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${g2o_LIBRARY_OUTPUT_DIRECTORY})
 SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${g2o_RUNTIME_OUTPUT_DIRECTORY})
@@ -54,12 +50,14 @@ IF(OPENMP_FOUND AND G2O_USE_OPENMP)
 ENDIF(OPENMP_FOUND AND G2O_USE_OPENMP)
 
 # Compiler specific options for gcc
-SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native") 
-SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native") 
+#SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
+#SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -march=native")
+# SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+# SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
 
 # activate warnings !!!
-SET(g2o_C_FLAGS "${g2o_C_FLAGS} -Wall -W")
-SET(g2o_CXX_FLAGS "${g2o_CXX_FLAGS} -Wall -W")
+#SET(g2o_C_FLAGS "${g2o_C_FLAGS} -Wall -W")
+#SET(g2o_CXX_FLAGS "${g2o_CXX_FLAGS} -Wall -W")
 
 # specifying compiler flags
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${g2o_CXX_FLAGS}")
@@ -77,13 +75,6 @@ ENDIF(EIGEN3_FOUND)
 # Generate config.h
 SET(G2O_CXX_COMPILER "${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER}")
 configure_file(config.h.in ${g2o_SOURCE_DIR}/config.h)
-
-# Set up the top-level include directories
-INCLUDE_DIRECTORIES(
-${g2o_SOURCE_DIR}/core
-${g2o_SOURCE_DIR}/types
-${g2o_SOURCE_DIR}/stuff 
-${G2O_EIGEN3_INCLUDE})
 
 # Include the subdirectories
 ADD_LIBRARY(g2o ${G2O_LIB_TYPE}
@@ -151,6 +142,8 @@ g2o/core/optimization_algorithm_with_hessian.cpp
 g2o/core/optimization_algorithm_with_hessian.h
 g2o/core/optimization_algorithm_levenberg.cpp 
 g2o/core/optimization_algorithm_levenberg.h
+g2o/core/optimization_algorithm_gauss_newton.cpp 
+g2o/core/optimization_algorithm_gauss_newton.h
 g2o/core/jacobian_workspace.cpp 
 g2o/core/jacobian_workspace.h
 g2o/core/robust_kernel.cpp 
@@ -172,3 +165,10 @@ g2o/stuff/string_tools.cpp
 g2o/stuff/property.cpp       
 g2o/stuff/property.h       
 )
+
+# Set up the top-level include directories
+TARGET_INCLUDE_DIRECTORIES(g2o PUBLIC
+        ${g2o_SOURCE_DIR}/core
+        ${g2o_SOURCE_DIR}/types
+        ${g2o_SOURCE_DIR}/stuff
+        ${G2O_EIGEN3_INCLUDE})

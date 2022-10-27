@@ -31,27 +31,16 @@ BowVector::~BowVector(void)
 
 // --------------------------------------------------------------------------
 
-/**
- * @brief 更新BowVector中的单词权重
- * 
- * @param[in] id    单词的ID
- * @param[in] v     单词的权重
- */
 void BowVector::addWeight(WordId id, WordValue v)
 {
-  // 返回指向大于等于id的第一个值的位置
   BowVector::iterator vit = this->lower_bound(id);
   
-  
-  // http://www.cplusplus.com/reference/map/map/key_comp/
   if(vit != this->end() && !(this->key_comp()(id, vit->first)))
   {
-    // 如果id = vit->first, 说明是同一个Word，权重更新 
     vit->second += v;
   }
   else
   {
-    // 如果该Word id不在BowVector中，新添加进来
     this->insert(vit, BowVector::value_type(id, v));
   }
 }
