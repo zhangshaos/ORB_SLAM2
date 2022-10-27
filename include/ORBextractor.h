@@ -23,7 +23,7 @@
 
 #include <vector>
 #include <list>
-#include <opencv/cv.h>
+#include <opencv2/imgcodecs/legacy/constants_c.h>
 
 
 //这个文件主要负责进行ORB特征点的提取和数目分配功能

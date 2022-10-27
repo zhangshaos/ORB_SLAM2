@@ -27,7 +27,7 @@
 #include <thread>					//多线程
 #include <pangolin/pangolin.h>		//可视化界面
 #include <iomanip>					//主要是对cin,cout之类的一些操纵运算子
-#include <unistd.h>
+
 namespace ORB_SLAM2
 {
 
@@ -183,7 +183,7 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, 		//左侧图像
             // Wait until Local Mapping has effectively stopped
             while(!mpLocalMapper->isStopped())
             {
-                usleep(1000);
+                this_thread::sleep_for(1000us);
             }
             //运行到这里的时候，局部建图部分就真正地停止了
             //告知追踪器，现在 只有追踪工作
@@ -253,7 +253,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
             // Wait until Local Mapping has effectively stopped
             while(!mpLocalMapper->isStopped())
             {
-                usleep(1000);
+                this_thread::sleep_for(1000us);
             }
 
             mpTracker->InformOnlyTracking(true);
@@ -309,7 +309,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
             // Wait until Local Mapping has effectively stopped
             while(!mpLocalMapper->isStopped())
             {
-                usleep(1000);
+                this_thread::sleep_for(1000us);
             }
 
             // 局部地图关闭以后，只进行追踪的线程，只计算相机的位姿，没有对局部地图进行更新
@@ -399,7 +399,7 @@ void System::Shutdown()
         mpViewer->RequestFinish();
         //等到，知道真正地停止
         while(!mpViewer->isFinished())
-            usleep(5000);
+            this_thread::sleep_for(5000us);
     }
 
     // Wait until all thread have effectively stopped
@@ -407,7 +407,7 @@ void System::Shutdown()
     	  !mpLoopCloser->isFinished()  || 
     	   mpLoopCloser->isRunningGBA())			
     {
-        usleep(5000);
+        this_thread::sleep_for(5000us);
     }
 
     if(mpViewer)
