@@ -3,10 +3,10 @@ lib/
 build/
 cmake-build-*/
 
-Vocabulary/
-!ORBvoc.bin
-Out/
-data/
+Vocabulary/**
+!Vocabulary/ORBvoc.bin
+Out/**
+data/**
 
 .vscode/
 .vs/
