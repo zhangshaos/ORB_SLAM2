@@ -639,10 +639,10 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
                 continue;
 
             // 如果这个网格中有特征点，那么遍历这个图像网格中所有的特征点
-            for(size_t j=0, jend=vCell.size(); j<jend; j++)
+            for(unsigned long long j : vCell)
             {
 				// 根据索引先读取这个特征点 
-                const cv::KeyPoint &kpUn = mvKeysUn[vCell[j]];
+                const cv::KeyPoint &kpUn = mvKeysUn[j];
 				// 保证给定的搜索金字塔层级范围合法
                 if(bCheckLevels)
                 {
@@ -661,7 +661,7 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
 
 				// 如果x方向和y方向的距离都在指定的半径之内，存储其index为候选特征点
                 if(fabs(distx)<r && fabs(disty)<r)
-                    vIndices.push_back(vCell[j]);
+                    vIndices.push_back(j);
             }
         }
     }
@@ -919,9 +919,8 @@ void Frame::ComputeStereoMatches()
         const cv::Mat &dL = mDescriptors.row(iL);
         
         // Step 2. 粗配准。左图特征点il与右图中的可能的匹配点进行逐个比较,得到最相似匹配点的描述子距离和索引
-        for(size_t iC=0; iC<vCandidates.size(); iC++) {
+        for(unsigned long long iR : vCandidates) {
 
-            const size_t iR = vCandidates[iC];
             const cv::KeyPoint &kpR = mvKeysRight[iR];
 
             // 左图特征点il与待匹配点ic的空间尺度差超过2，放弃
@@ -1058,7 +1057,7 @@ void Frame::ComputeStereoMatches()
                 // Step 5. 最优视差值/深度选择.
                 mvDepth[iL]=mbf/disparity;
                 mvuRight[iL] = bestuR;
-                vDistIdx.push_back(pair<int,int>(bestDist,iL));
+                vDistIdx.emplace_back(bestDist,iL);
         }   
     }
     }
@@ -1155,7 +1154,7 @@ cv::Mat Frame::UnprojectStereo(const int &i)
     }
     else
         /** <li> 如果深度值不合法，那么就返回一个空矩阵,表示计算失败 </li> */
-        return cv::Mat();
+        return {};
     /** </ul> */
     /** </ul> */
 }

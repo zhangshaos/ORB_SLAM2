@@ -22,71 +22,67 @@
 
 //包含了一些自建库
 #include "System.h"
-#include "Converter.h"		// TODO 目前还不是很明白这个是做什么的
+#include "Converter.h"
+
 //包含共有库
-#include <thread>					//多线程
-#include <pangolin/pangolin.h>		//可视化界面
-#include <iomanip>					//主要是对cin,cout之类的一些操纵运算子
+#include <thread>
+#include <iomanip>
+
+#include <pangolin/pangolin.h>	//可视化界面
+#include <glog/logging.h>
+#include <happly/happly.h>      //Save ply file
+
 
 namespace ORB_SLAM2
 {
 
 //系统的构造函数，将会启动其他的线程
-System::System(const string &strVocFile,					//词典文件路径
-			   const string &strSettingsFile,				//配置文件路径
-			   const eSensor sensor,						//传感器类型
-               const bool bUseViewer):						//是否使用可视化界面
-					 mSensor(sensor), 							//初始化传感器类型
-					 mpViewer(static_cast<Viewer*>(NULL)),		//空。。。对象指针？  TODO 
-					 mbReset(false),							//无复位标志
-					 mbActivateLocalizationMode(false),			//没有这个模式转换标志
-        			 mbDeactivateLocalizationMode(false)		//没有这个模式转换标志
+System::System(const string &strVocFile,				//词典文件路径
+			         const string &strSettingsFile,   //配置文件路径
+               const eSensor sensor,						//传感器类型
+               const bool bUseViewer):					//是否使用可视化界面
+         mSensor(sensor), 							        //初始化传感器类型
+         mpViewer(nullptr),		                  //空。。。对象指针？
+         mbReset(false),							          //无复位标志
+         mbActivateLocalizationMode(false),			//没有这个模式转换标志
+         mbDeactivateLocalizationMode(false)		//没有这个模式转换标志
 {
     // Output welcome message
-    cout << endl <<
-    "ORB-SLAM2 Copyright (C) 2014-2016 Raul Mur-Artal, University of Zaragoza." << endl <<
-    "This program comes with ABSOLUTELY NO WARRANTY;" << endl  <<
-    "This is free software, and you are welcome to redistribute it" << endl <<
-    "under certain conditions. See LICENSE.txt." << endl << endl;
+    LOG(INFO) << "\nORB-SLAM2 Copyright (C) 2014-2016 Raul Mur-Artal, University of Zaragoza.\n"
+                 "This program comes with ABSOLUTELY NO WARRANTY;\n"
+                 "This is free software, and you are welcome to redistribute it\n"
+                 "under certain conditions. See LICENSE.txt.\n";
 
     // 输出当前传感器类型
-    cout << "Input sensor was set to: ";
-
+    LOG(INFO) << "Input sensor was set to: ";
     if(mSensor==MONOCULAR)
-        cout << "Monocular" << endl;
+        LOG(INFO) << "Monocular\n";
     else if(mSensor==STEREO)
-        cout << "Stereo" << endl;
+        LOG(INFO) << "Stereo\n";
     else if(mSensor==RGBD)
-        cout << "RGB-D" << endl;
+        LOG(INFO) << "RGB-D\n";
 
     //Check settings file
-    cv::FileStorage fsSettings(strSettingsFile.c_str(), 	//将配置文件名转换成为字符串
-    						   cv::FileStorage::READ);		//只读
-    //如果打开失败，就输出调试信息
+    cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
     if(!fsSettings.isOpened())
     {
-       cerr << "Failed to open settings file at: " << strSettingsFile << endl;
-       //然后退出
+       LOG(ERROR) << "Failed to open settings file at: " << strSettingsFile << endl;
        exit(-1);
     }
 
     //Load ORB Vocabulary
-    cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
+    LOG(INFO) << "Loading ORB Vocabulary. This could take a while...\n";
 
     //建立一个新的ORB字典
     mpVocabulary = new ORBVocabulary();
-    //获取字典加载状态
-    bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
-    //如果加载失败，就输出调试信息
+    bool bVocLoad = mpVocabulary->loadFromBinaryFile(strVocFile);
     if(!bVocLoad)
     {
-        cerr << "Wrong path to vocabulary. " << endl;
-        cerr << "Falied to open at: " << strVocFile << endl;
-        //然后退出
+        LOG(ERROR) << "Wrong path to vocabulary. "
+                   << "Failed to open at: " << strVocFile << endl;
         exit(-1);
     }
-    //否则则说明加载成功
-    cout << "Vocabulary loaded!" << endl << endl;
+    LOG(INFO) << "Vocabulary loaded!\n";
 
     //Create KeyFrame Database
     mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
@@ -102,44 +98,41 @@ System::System(const string &strVocFile,					//词典文件路径
     //在本主进程中初始化追踪线程
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
-    mpTracker = new Tracking(this,						//现在还不是很明白为什么这里还需要一个this指针  TODO  
-    						 mpVocabulary,				//字典
-    						 mpFrameDrawer, 			//帧绘制器
-    						 mpMapDrawer,				//地图绘制器
-                             mpMap, 					//地图
-                             mpKeyFrameDatabase, 		//关键帧地图
-                             strSettingsFile, 			//设置文件路径
-                             mSensor);					//传感器类型iomanip
+    mpTracker = new Tracking(this,
+                             mpVocabulary,				//字典
+                             mpFrameDrawer, 			//帧绘制器
+    						             mpMapDrawer,				  //地图绘制器
+                             mpMap, 					    //地图
+                             mpKeyFrameDatabase, 	//关键帧地图
+                             strSettingsFile, 		//设置文件路径
+                             mSensor);					  //传感器类型
 
     //初始化局部建图线程并运行
     //Initialize the Local Mapping thread and launch
-    mpLocalMapper = new LocalMapping(mpMap, 				//指定使iomanip
-    								 mSensor==MONOCULAR);	// TODO 为什么这个要设置成为MONOCULAR？？？
+    mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);
     //运行这个局部建图线程
-    mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,	//这个线程会调用的函数
-    							 mpLocalMapper);				//这个调用函数的参数
+    mptLocalMapping = new std::thread(&ORB_SLAM2::LocalMapping::Run, mpLocalMapper);
 
-    //Initialize the Loop Closing thread and launchiomanip
-    mpLoopCloser = new LoopClosing(mpMap, 						//地图
-    							   mpKeyFrameDatabase, 			//关键帧数据库
-    							   mpVocabulary, 				//ORB字典
-    							   mSensor!=MONOCULAR);			//当前的传感器是否是单目
+    //Initialize the Loop Closing thread and launch
+    mpLoopCloser = new LoopClosing(mpMap, 						  //地图
+                                   mpKeyFrameDatabase, 	//关键帧数据库
+                                   mpVocabulary, 				//ORB字典
+                                   mSensor!=MONOCULAR); //当前的传感器是否是单目
     //创建回环检测线程
-    mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run,	//线程的主函数
-    							mpLoopCloser);					//该函数的参数
+    mptLoopClosing = new std::thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
 
     //Initialize the Viewer thread and launch
     if(bUseViewer)
     {
-    	//如果指定了，程序的运行过程中需要运行可视化部分
-    	//新建viewer
-        mpViewer = new Viewer(this, 			//又是这个
-        					  mpFrameDrawer,	//帧绘制器
-        					  mpMapDrawer,		//地图绘制器
-        					  mpTracker,		//追踪器
+    	  //如果指定了，程序的运行过程中需要运行可视化部分
+    	  //新建viewer
+        mpViewer = new Viewer(this,
+        					  mpFrameDrawer,	  //帧绘制器
+        					  mpMapDrawer,		  //地图绘制器
+        					  mpTracker,		    //追踪器
         					  strSettingsFile);	//配置文件的访问路径
         //新建viewer线程
-        mptViewer = new thread(&Viewer::Run, mpViewer);
+        mptViewer = new std::thread(&Viewer::Run, mpViewer);
         //给运动追踪器设置其查看器
         mpTracker->SetViewer(mpViewer);
     }
@@ -329,12 +322,12 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
 
     // Check reset
     {
-    unique_lock<mutex> lock(mMutexReset);
-    if(mbReset)
-    {
-        mpTracker->Reset();
-        mbReset = false;
-    }
+      unique_lock<mutex> lock(mMutexReset);
+      if(mbReset)
+      {
+          mpTracker->Reset();
+          mbReset = false;
+      }
     }
 
     //获取相机位姿的估计结果
@@ -419,7 +412,7 @@ void System::Shutdown()
 //按照TUM格式保存相机运行轨迹并保存到指定的文件中
 void System::SaveTrajectoryTUM(const string &filename)
 {
-    cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    LOG(INFO) << endl << "Saving camera trajectory to " << filename << " ..." << endl;
     //只有在传感器为双目或者RGBD时才可以工作
     if(mSensor==MONOCULAR)
     {
@@ -503,14 +496,14 @@ void System::SaveTrajectoryTUM(const string &filename)
 
     //操作完毕，关闭文件并且输出调试信息
     f.close();
-    cout << endl << "trajectory saved!" << endl;
+    LOG(INFO) << endl << "trajectory saved!" << endl;
 }
 
 
 //保存关键帧的轨迹
 void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 {
-    cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
+    LOG(INFO) << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
 
     //获取关键帧vector并按照生成时间对其进行排序
     vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
@@ -551,13 +544,13 @@ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 
     //关闭文件
     f.close();
-    cout << endl << "trajectory saved!" << endl;
+    LOG(INFO) << endl << "trajectory saved!" << endl;
 }
 
 //按照KITTI数据集的格式将相机的运动轨迹保存到文件中
 void System::SaveTrajectoryKITTI(const string &filename)
 {
-    cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    LOG(INFO) << "\nSaving camera trajectory to " << filename << " ..." << endl;
     //检查输入数据的类型
     if(mSensor==MONOCULAR)
     {
@@ -593,7 +586,7 @@ void System::SaveTrajectoryKITTI(const string &filename)
 
         while(pKF->isBad())
         {
-          //  cout << "bad parent" << endl;
+            //  LOG(INFO) << "bad parent" << endl;
             Trw = Trw*pKF->mTcp;
             pKF = pKF->GetParent();
         }
@@ -609,7 +602,7 @@ void System::SaveTrajectoryKITTI(const string &filename)
              Rwc.at<float>(2,0) << " " << Rwc.at<float>(2,1)  << " " << Rwc.at<float>(2,2) << " "  << twc.at<float>(2) << endl;
     }
     f.close();
-    cout << endl << "trajectory saved!" << endl;
+    LOG(INFO) << endl << "trajectory saved!" << endl;
 }
 
 //获取追踪器状态
@@ -631,6 +624,28 @@ vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
 {
     unique_lock<mutex> lock(mMutexState);
     return mTrackedKeyPointsUn;
+}
+
+bool System::SaveMap(const string &filename) {
+  auto mapPoints = mpMap->GetAllMapPoints();
+  if (mapPoints.empty())
+    return false;
+  happly::PLYData plyFile;
+  std::vector<std::array<double, 3>> vertexesPosition;
+  for (auto p : mapPoints)
+    if (p && !p->isBad())
+    {
+      cv::Mat wPos = p->GetWorldPos();
+      double x = wPos.at<float>(0), y = wPos.at<float>(1), z = wPos.at<float>(2);
+      vertexesPosition.emplace_back(std::array<double,3>{x, y, z});
+    }
+  plyFile.addVertexPositions(vertexesPosition);
+  plyFile.write(filename, happly::DataFormat::Binary);
+  return true;
+}
+
+bool System::LoadMap(const string &filename) {
+  return false;
 }
 
 } //namespace ORB_SLAM

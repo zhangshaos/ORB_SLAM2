@@ -72,7 +72,7 @@ public:
     System(const string &strVocFile,            //指定ORB字典文件的路径
            const string &strSettingsFile,       //指定配置文件的路径
            const eSensor sensor,                //指定所使用的传感器类型
-           const bool bUseViewer = true);       //指定是否使用可视化界面 TODO 
+           const bool bUseViewer = true);       //指定是否使用可视化界面
 
     //下面是针对三种不同类型的传感器所设计的三种运动追踪接口。彩色图像为CV_8UC3类型，并且都将会被转换成为灰度图像。
     //追踪接口返回估计的相机位姿，如果追踪失败则返回NULL
@@ -133,7 +133,7 @@ public:
     // NOTE This method works for all sensor input.
     // Call first Shutdown()
     // See format details at: http://vision.in.tum.de/data/datasets/rgbd-dataset
-    // 以TUM格式保存关键帧位姿。  TODO 是不是这也意味着，我可以使用g2o_viewer这样的软件去查看并且进行优化实验？
+    // 以TUM格式保存关键帧位姿。
     void SaveKeyFrameTrajectoryTUM(const string &filename);     //指定文件名
 
     // Save camera trajectory in the KITTI dataset format.
@@ -143,10 +143,9 @@ public:
     // 以KITTI格式保存相机的运行轨迹
     void SaveTrajectoryKITTI(const string &filename);
 
-    // TODO: Save/Load functions
     // 在这里可以实现自己的地图保存和加载函数
-    // SaveMap(const string &filename);
-    // LoadMap(const string &filename);
+    bool SaveMap(const string &filename);
+    bool LoadMap(const string &filename);
 
     // Information from most recent processed frame
     // You can call this right after TrackMonocular (or stereo or RGBD)
@@ -209,7 +208,7 @@ private:
     std::thread* mptViewer;
 
     // Reset flag
-    //复位标志，注意这里目前还不清楚为什么要定义为std::mutex类型 TODO 
+    //复位标志，注意这里目前还不清楚为什么要定义为std::mutex类型
     std::mutex mMutexReset;
     bool mbReset;
 

@@ -36,11 +36,13 @@
 
 #include<mutex>
 
+#include <glog/logging.h>
+
 namespace ORB_SLAM2
 {
 
 // 构造函数
-LocalMapping::LocalMapping(Map *pMap, const float bMonocular):
+LocalMapping::LocalMapping(Map *pMap, bool bMonocular):
     mbMonocular(bMonocular), mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
     mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false), mbAcceptKeyFrames(true)
 {
@@ -244,7 +246,7 @@ void LocalMapping::ProcessNewKeyFrame()
 void LocalMapping::MapPointCulling()
 {
     // Check Recent Added MapPoints
-    list<MapPoint*>::iterator lit = mlpRecentAddedMapPoints.begin();
+    auto lit = mlpRecentAddedMapPoints.begin();
     const unsigned long int nCurrentKFid = mpCurrentKeyFrame->mnId;
 
     // Step 1：根据相机类型设置不同的观测阈值
@@ -638,9 +640,8 @@ void LocalMapping::SearchInNeighbors()
     // Step 2：存储一级相邻关键帧及其二级相邻关键帧
     vector<KeyFrame*> vpTargetKFs;
     // 开始对所有候选的一级关键帧展开遍历：
-    for(vector<KeyFrame*>::const_iterator vit=vpNeighKFs.begin(), vend=vpNeighKFs.end(); vit!=vend; vit++)
+    for(auto pKFi : vpNeighKFs)
     {
-        KeyFrame* pKFi = *vit;
         // 没有和当前帧进行过融合的操作
         if(pKFi->isBad() || pKFi->mnFuseTargetForKF == mpCurrentKeyFrame->mnId)
             continue;
@@ -653,9 +654,8 @@ void LocalMapping::SearchInNeighbors()
         // 以一级相邻关键帧的共视关系最好的5个相邻关键帧 作为二级相邻关键帧
         const vector<KeyFrame*> vpSecondNeighKFs = pKFi->GetBestCovisibilityKeyFrames(5);
         // 遍历得到的二级相邻关键帧
-        for(vector<KeyFrame*>::const_iterator vit2=vpSecondNeighKFs.begin(), vend2=vpSecondNeighKFs.end(); vit2!=vend2; vit2++)
+        for(auto pKFi2 : vpSecondNeighKFs)
         {
-            KeyFrame* pKFi2 = *vit2;
             // 当然这个二级相邻关键帧要求没有和当前关键帧发生融合,并且这个二级相邻关键帧也不是当前关键帧
             if(pKFi2->isBad() || pKFi2->mnFuseTargetForKF==mpCurrentKeyFrame->mnId || pKFi2->mnId==mpCurrentKeyFrame->mnId)
                 continue;
@@ -670,10 +670,8 @@ void LocalMapping::SearchInNeighbors()
 
     // Step 3：将当前帧的地图点分别投影到两级相邻关键帧，寻找匹配点对应的地图点进行融合，称为正向投影融合
     vector<MapPoint*> vpMapPointMatches = mpCurrentKeyFrame->GetMapPointMatches();
-    for(vector<KeyFrame*>::iterator vit=vpTargetKFs.begin(), vend=vpTargetKFs.end(); vit!=vend; vit++)
+    for(auto pKFi : vpTargetKFs)
     {
-        KeyFrame* pKFi = *vit;
-
         // 将地图点投影到关键帧中进行匹配和融合；融合策略如下
         // 1.如果地图点能匹配关键帧的特征点，并且该点有对应的地图点，那么选择观测数目多的替换两个地图点
         // 2.如果地图点能匹配关键帧的特征点，并且该点没有对应的地图点，那么为该点添加该投影地图点
@@ -688,15 +686,13 @@ void LocalMapping::SearchInNeighbors()
     vpFuseCandidates.reserve(vpTargetKFs.size()*vpMapPointMatches.size());
     
     //  Step 4.1：遍历每一个一级邻接和二级邻接关键帧，收集他们的地图点存储到 vpFuseCandidates
-    for(vector<KeyFrame*>::iterator vitKF=vpTargetKFs.begin(), vendKF=vpTargetKFs.end(); vitKF!=vendKF; vitKF++)
+    for(auto pKFi : vpTargetKFs)
     {
-        KeyFrame* pKFi = *vitKF;
         vector<MapPoint*> vpMapPointsKFi = pKFi->GetMapPointMatches();
 
         // 遍历当前一级邻接和二级邻接关键帧中所有的MapPoints,找出需要进行融合的并且加入到集合中
-        for(vector<MapPoint*>::iterator vitMP=vpMapPointsKFi.begin(), vendMP=vpMapPointsKFi.end(); vitMP!=vendMP; vitMP++)
+        for(auto pMP : vpMapPointsKFi)
         {
-            MapPoint* pMP = *vitMP;
             if(!pMP)
                 continue;
             
@@ -778,7 +774,7 @@ bool LocalMapping::Stop()
     if(mbStopRequested && !mbNotStop)
     {
         mbStopped = true;
-        cout << "Local Mapping STOP" << endl;
+        LOG(INFO) << "Local Mapping STOP" << endl;
         return true;
     }
 
@@ -808,11 +804,11 @@ void LocalMapping::Release()
         return;
     mbStopped = false;
     mbStopRequested = false;
-    for(list<KeyFrame*>::iterator lit = mlNewKeyFrames.begin(), lend=mlNewKeyFrames.end(); lit!=lend; lit++)
-        delete *lit;
+    for(auto & mlNewKeyFrame : mlNewKeyFrames)
+        delete mlNewKeyFrame;
     mlNewKeyFrames.clear();
 
-    cout << "Local Mapping RELEASE" << endl;
+    LOG(INFO) << "Local Mapping RELEASE" << endl;
 }
 
 // 查看当前是否允许接受关键帧
@@ -877,9 +873,8 @@ void LocalMapping::KeyFrameCulling()
     vector<KeyFrame*> vpLocalKeyFrames = mpCurrentKeyFrame->GetVectorCovisibleKeyFrames();
 
     // 对所有的共视关键帧进行遍历
-    for(vector<KeyFrame*>::iterator vit=vpLocalKeyFrames.begin(), vend=vpLocalKeyFrames.end(); vit!=vend; vit++)
+    for(auto pKF : vpLocalKeyFrames)
     {
-        KeyFrame* pKF = *vit;
         // 第1个关键帧不能删除，跳过
         if(pKF->mnId==0)
             continue;

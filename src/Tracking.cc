@@ -47,6 +47,8 @@
 #include <cmath>
 #include <mutex>
 
+#include <glog/logging.h>
+
 
 using namespace std;
 
@@ -134,27 +136,27 @@ Tracking::Tracking(
     mMaxFrames = fps;
 
     //输出
-    cout << endl << "Camera Parameters: " << endl;
-    cout << "- fx: " << fx << endl;
-    cout << "- fy: " << fy << endl;
-    cout << "- cx: " << cx << endl;
-    cout << "- cy: " << cy << endl;
-    cout << "- k1: " << DistCoef.at<float>(0) << endl;
-    cout << "- k2: " << DistCoef.at<float>(1) << endl;
+    LOG(INFO) << "Camera Parameters:\n";
+    LOG(INFO) << "- fx: " << fx << endl;
+    LOG(INFO) << "- fy: " << fy << endl;
+    LOG(INFO) << "- cx: " << cx << endl;
+    LOG(INFO) << "- cy: " << cy << endl;
+    LOG(INFO) << "- k1: " << DistCoef.at<float>(0) << endl;
+    LOG(INFO) << "- k2: " << DistCoef.at<float>(1) << endl;
     if(DistCoef.rows==5)
-        cout << "- k3: " << DistCoef.at<float>(4) << endl;
-    cout << "- p1: " << DistCoef.at<float>(2) << endl;
-    cout << "- p2: " << DistCoef.at<float>(3) << endl;
-    cout << "- fps: " << fps << endl;
+        LOG(INFO) << "- k3: " << DistCoef.at<float>(4) << endl;
+    LOG(INFO) << "- p1: " << DistCoef.at<float>(2) << endl;
+    LOG(INFO) << "- p2: " << DistCoef.at<float>(3) << endl;
+    LOG(INFO) << "- fps: " << fps << endl;
 
     // 1:RGB 0:BGR
     int nRGB = fSettings["Camera.RGB"];
     mbRGB = nRGB;
 
     if(mbRGB)
-        cout << "- color order: RGB (ignored if grayscale)" << endl;
+        LOG(INFO) << "- color order: RGB (ignored if grayscale)" << endl;
     else
-        cout << "- color order: BGR (ignored if grayscale)" << endl;
+        LOG(INFO) << "- color order: BGR (ignored if grayscale)" << endl;
 
     // Load ORB parameters
 
@@ -187,19 +189,19 @@ Tracking::Tracking(
     if(sensor==System::MONOCULAR)
         mpIniORBextractor = new ORBextractor(2*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
-    cout << endl  << "ORB Extractor Parameters: " << endl;
-    cout << "- Number of Features: " << nFeatures << endl;
-    cout << "- Scale Levels: " << nLevels << endl;
-    cout << "- Scale Factor: " << fScaleFactor << endl;
-    cout << "- Initial Fast Threshold: " << fIniThFAST << endl;
-    cout << "- Minimum Fast Threshold: " << fMinThFAST << endl;
+    LOG(INFO) << "ORB Extractor Parameters:\n";
+    LOG(INFO) << "- Number of Features: " << nFeatures << endl;
+    LOG(INFO) << "- Scale Levels: " << nLevels << endl;
+    LOG(INFO) << "- Scale Factor: " << fScaleFactor << endl;
+    LOG(INFO) << "- Initial Fast Threshold: " << fIniThFAST << endl;
+    LOG(INFO) << "- Minimum Fast Threshold: " << fMinThFAST << endl;
 
     if(sensor==System::STEREO || sensor==System::RGBD)
     {
         // 判断一个3D点远/近的阈值 mbf * 35 / fx
         //ThDepth其实就是表示基线长度的多少倍
         mThDepth = mbf*(float)fSettings["ThDepth"]/fx;
-        cout << endl << "Depth Threshold (Close/Far Points): " << mThDepth << endl;
+        LOG(INFO) << endl << "Depth Threshold (Close/Far Points): " << mThDepth << endl;
     }
 
     if(sensor==System::RGBD)
@@ -720,7 +722,7 @@ void Tracking::Track()
             //如果地图中的关键帧信息过少的话,直接重新进行初始化了
             if(mpMap->KeyFramesInMap()<=5)
             {
-                cout << "Track lost soon after initialisation, reseting..." << endl;
+                LOG(INFO) << "Track lost soon after initialisation, reseting..." << endl;
                 mpSystem->Reset();
                 return;
             }
@@ -822,7 +824,7 @@ void Tracking::StereoInitialization()
             }
         }
 
-        cout << "New map created with " << mpMap->MapPointsInMap() << " points" << endl;
+        LOG(INFO) << "New map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
         // 在局部地图中添加该初始关键帧
         mpLocalMapper->InsertKeyFrame(pKFini);
@@ -883,10 +885,7 @@ void Tracking::MonocularInitialization()
             for(size_t i=0; i<mCurrentFrame.mvKeysUn.size(); i++)
                 mvbPrevMatched[i]=mCurrentFrame.mvKeysUn[i].pt;
 
-            // 删除前判断一下，来避免出现段错误。不过在这里是多余的判断
-            // 不过在这里是多余的判断，因为前面已经判断过了
-            if(mpInitializer)
-                delete mpInitializer;
+            delete mpInitializer;
 
             // 由当前帧构造初始器 sigma:1.0 iterations:200
             mpInitializer =  new Initializer(mCurrentFrame,1.0,200);
@@ -1048,7 +1047,7 @@ void Tracking::CreateInitialMapMonocular()
     pKFcur->UpdateConnections();
 
     // Bundle Adjustment
-    cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
+    LOG(INFO) << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
     // Step 4 全局BA优化，同时优化所有位姿和三维点
     Optimizer::GlobalBundleAdjustemnt(mpMap,20);
@@ -1062,7 +1061,7 @@ void Tracking::CreateInitialMapMonocular()
     //两个条件,一个是平均深度要大于0,另外一个是在当前帧中被观测到的地图点的数目应该大于100
     if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<100)
     {
-        cout << "Wrong initialization, reseting..." << endl;
+        LOG(INFO) << "Wrong initialization, reseting..." << endl;
         Reset();
         return;
     }
@@ -2245,22 +2244,22 @@ void Tracking::Reset()
         while(!mpViewer->isStopped())
             std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
-    cout << "System Reseting" << endl;
+    LOG(INFO) << "System Reseting" << endl;
 
     // Reset Local Mapping
-    cout << "Reseting Local Mapper...";
+    LOG(INFO) << "Reseting Local Mapper...";
     mpLocalMapper->RequestReset();
-    cout << " done" << endl;
+    LOG(INFO) << " done" << endl;
 
     // Reset Loop Closing
-    cout << "Reseting Loop Closing...";
+    LOG(INFO) << "Reseting Loop Closing...";
     mpLoopClosing->RequestReset();
-    cout << " done" << endl;
+    LOG(INFO) << " done" << endl;
 
     // Clear BoW Database
-    cout << "Reseting Database...";
+    LOG(INFO) << "Reseting Database...";
     mpKeyFrameDB->clear();
-    cout << " done" << endl;
+    LOG(INFO) << " done" << endl;
 
     // Clear Map (this erase MapPoints and KeyFrames)
     mpMap->clear();

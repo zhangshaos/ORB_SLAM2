@@ -4,6 +4,9 @@ build/
 cmake-build-*/
 
 Vocabulary/
+!ORBvoc.bin
+Out/
+data/
 
 .vscode/
 .vs/

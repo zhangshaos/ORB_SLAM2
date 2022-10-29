@@ -1,34 +1,13 @@
-toc
-- [ORB-SLAM2](#orb-slam2)
-    - [Related Publications:](#related-publications)
-- [1. License](#1-license)
-- [2. Prerequisites](#2-prerequisites)
-  - [C++11 or C++0x Compiler](#c11-or-c0x-compiler)
-  - [Pangolin](#pangolin)
-  - [OpenCV](#opencv)
-  - [Eigen3](#eigen3)
-  - [DBoW2 and g2o (Included in Thirdparty folder)](#dbow2-and-g2o-included-in-thirdparty-folder)
-  - [ROS (optional)](#ros-optional)
-- [3. Building ORB-SLAM2 library and examples](#3-building-orb-slam2-library-and-examples)
-- [4. Monocular Examples](#4-monocular-examples)
-  - [TUM Dataset](#tum-dataset)
-  - [KITTI Dataset](#kitti-dataset)
-  - [EuRoC Dataset](#euroc-dataset)
-- [5. Stereo Examples](#5-stereo-examples)
-  - [KITTI Dataset](#kitti-dataset-1)
-  - [EuRoC Dataset](#euroc-dataset-1)
-- [6. RGB-D Example](#6-rgb-d-example)
-  - [TUM Dataset](#tum-dataset-1)
-- [7. ROS Examples](#7-ros-examples)
-    - [Building the nodes for mono, monoAR, stereo and RGB-D](#building-the-nodes-for-mono-monoar-stereo-and-rgb-d)
-    - [Running Monocular Node](#running-monocular-node)
-    - [Running Monocular Augmented Reality Demo](#running-monocular-augmented-reality-demo)
-    - [Running Stereo Node](#running-stereo-node)
-    - [Running RGB_D Node](#running-rgb_d-node)
-- [8. Processing your own sequences](#8-processing-your-own-sequences)
-- [9. SLAM and Localization Modes](#9-slam-and-localization-modes)
-    - [SLAM Mode](#slam-mode)
-    - [Localization Mode](#localization-mode)
+[toc]
+
+
+# 用法
+
+0. 准备 `launch.toml` 文件：FBoW库的二进制字典文件、图片路径收录文件、相机位姿收录文件和ORB-SLAM2配置文件。
+   > 参考 launch.toml, ORBVoc.bin, shenzhen_images.txt, shenzhen_cameras.txt, shenzhen_simple.yaml 文件。
+1. 设置环境变量 `GLOG_logtostderr=1` 让 glog 日志直接打印到控制台，而不是写入日志文件中。
+2. 编译生成CMake目标 mono_shenzhen 。
+3. 运行 `./mono_shenzhen ./launch.toml` ，在Out/目录下保存结果。
 
 
 # ORB-SLAM2

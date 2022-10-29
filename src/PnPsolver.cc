@@ -959,13 +959,6 @@ void PnPsolver::estimate_R_and_t(double R[3][3], double t[3])
   t[2] = pc0[2] - dot(R[2], pw0);
 }
 
-// DEPRECATED 输出位姿,不过目测这个函数应该是在ORB中被废弃了(因为根本用不到啊)
-void PnPsolver::print_pose(const double R[3][3], const double t[3])
-{
-  cout << R[0][0] << " " << R[0][1] << " " << R[0][2] << " " << t[0] << endl;
-  cout << R[1][0] << " " << R[1][1] << " " << R[1][2] << " " << t[1] << endl;
-  cout << R[2][0] << " " << R[2][1] << " " << R[2][2] << " " << t[2] << endl;
-}
 
 // 保持所有点在相机坐标系下的深度为正,调整符号
 void PnPsolver::solve_for_sign(void)

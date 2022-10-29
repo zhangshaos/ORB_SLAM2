@@ -167,11 +167,11 @@ long unsigned int Map::GetMaxKFid()
 //清空地图中的数据
 void Map::clear()
 {
-    for(set<MapPoint*>::iterator sit=mspMapPoints.begin(), send=mspMapPoints.end(); sit!=send; sit++)
-        delete *sit;
+    for(auto mspMapPoint : mspMapPoints)
+        delete mspMapPoint;
 
-    for(set<KeyFrame*>::iterator sit=mspKeyFrames.begin(), send=mspKeyFrames.end(); sit!=send; sit++)
-        delete *sit;
+    for(auto mspKeyFrame : mspKeyFrames)
+        delete mspKeyFrame;
 
     mspMapPoints.clear();
     mspKeyFrames.clear();

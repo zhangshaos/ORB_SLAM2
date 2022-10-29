@@ -116,15 +116,13 @@ public:
      * @brief 获取图像金字塔的层数
      * @return int 图像金字塔的层数
      */
-    int inline GetLevels(){
-        return nlevels;}
+    int inline GetLevels(){ return nlevels; }
 
     /**
      * @brief 获取当前提取器所在的图像的缩放因子，这个不带s的因子表示是相临近层之间的
      * @return float 当前提取器所在的图像的缩放因子，相邻层之间
      */
-    float inline GetScaleFactor(){
-        return scaleFactor;}
+    float inline GetScaleFactor(){ return (float)scaleFactor; }
 
     /**
      * @brief 获取图像金字塔中每个图层相对于底层图像的缩放因子

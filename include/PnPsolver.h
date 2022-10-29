@@ -168,13 +168,6 @@ public:
               const double Rest[3][3],  const double test[3]);
 
   /**
-   * @brief 输出计算得到的位姿.这个函数是EPnP源码中自带的,用于调试,所以在ORB中应当算是一个被放弃了的函数(因为我们并不需要输出啊)
-   * @param[in] R 旋转
-   * @param[in] t 平移 
-   * @deprecated 在ORB中没有用到
-   */
-  void print_pose(const double R[3][3], const double t[3]);
-  /**
   * @brief 计算在给定位姿的时候的3D点投影误差
   * @param[in] R      给定旋转
   * @param[in] t      给定平移

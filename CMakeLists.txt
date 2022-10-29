@@ -15,6 +15,9 @@ endif()
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Pangolin REQUIRED)
+find_package(fmt CONFIG REQUIRED)
+find_package(glog REQUIRED)
+find_package(tomlplusplus CONFIG REQUIRED)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -56,21 +59,15 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         ${Pangolin_LIBRARIES}
         ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/DBoW2.lib
         ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/g2o.lib
+        glog::glog
+        tomlplusplus::tomlplusplus
+        fmt::fmt
         )
 
 ###################
 # Build examples  #
 ###################
 
-#add_executable(mono_tum
-#Examples/Monocular/mono_tum.cc)
-#target_link_libraries(mono_tum ${PROJECT_NAME})
-
-#add_executable(mono_kitti
-#Examples/Monocular/mono_kitti.cc)
-#target_link_libraries(mono_kitti ${PROJECT_NAME})
-
-#add_executable(mono_euroc
-#Examples/Monocular/mono_euroc.cc)
-#target_link_libraries(mono_euroc ${PROJECT_NAME})
+add_executable(mono_shenzhen Examples/Monocular/mono_shenzhen.cc)
+target_link_libraries(mono_shenzhen ${PROJECT_NAME})
 

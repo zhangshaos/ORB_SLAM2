@@ -60,7 +60,7 @@ public:
      * @param[in] pMap          局部地图的句柄？ //?
      * @param[in] bMonocular    当前系统是否是单目输入
      */
-    LocalMapping(Map* pMap, const float bMonocular);
+    LocalMapping(Map* pMap, bool bMonocular);
 
     /**
      * @brief 设置回环检测线程句柄

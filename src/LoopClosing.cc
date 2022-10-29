@@ -30,17 +30,15 @@
 */
 
 #include "LoopClosing.h"
-
 #include "Sim3Solver.h"
-
 #include "Converter.h"
-
 #include "Optimizer.h"
-
 #include "ORBmatcher.h"
 
-#include<mutex>
-#include<thread>
+#include <mutex>
+#include <thread>
+
+#include <glog/logging.h>
 
 
 namespace ORB_SLAM2
@@ -254,9 +252,9 @@ bool LoopClosing::DetectLoop()
             // Step 5.4：遍历每个“子候选组”，检测子候选组中每一个关键帧在“子连续组”中是否存在
             // 如果有一帧共同存在于“子候选组”与之前的“子连续组”，那么“子候选组”与该“子连续组”连续
             bool bConsistent = false;
-            for(set<KeyFrame*>::iterator sit=spCandidateGroup.begin(), send=spCandidateGroup.end(); sit!=send;sit++)
+            for(auto sit : spCandidateGroup)
             {
-                if(sPreviousGroup.count(*sit))
+                if(sPreviousGroup.count(sit))
                 {
                     // 如果存在，该“子候选组”与该“子连续组”相连
                     bConsistent=true;
@@ -546,9 +544,8 @@ bool LoopClosing::ComputeSim3()
     mvpLoopMapPoints.clear();
 
     // 遍历这个组中的每一个关键帧
-    for(vector<KeyFrame*>::iterator vit=vpLoopConnectedKFs.begin(); vit!=vpLoopConnectedKFs.end(); vit++)
+    for(auto pKF : vpLoopConnectedKFs)
     {
-        KeyFrame* pKF = *vit;
         vector<MapPoint*> vpMapPoints = pKF->GetMapPointMatches();
 
         // 遍历其中一个关键帧的所有有效地图点
@@ -614,7 +611,7 @@ bool LoopClosing::ComputeSim3()
 void LoopClosing::CorrectLoop()
 {
 
-    cout << "Loop detected!" << endl;
+    LOG(INFO) << "Loop detected!" << endl;
     // Step 0：结束局部地图线程、全局BA，为闭环矫正做准备
     // Step 1：根据共视关系更新当前帧与其它关键帧之间的连接
     // Step 2：通过位姿传播，得到Sim3优化后，与当前帧相连的关键帧的位姿，以及它们的MapPoints
@@ -687,9 +684,8 @@ void LoopClosing::CorrectLoop()
 
         // Step 2.1：通过mg2oScw（认为是准的）来进行位姿传播，得到当前关键帧的共视关键帧的世界坐标系下Sim3 位姿
         // 遍历"当前关键帧组""
-        for(vector<KeyFrame*>::iterator vit=mvpCurrentConnectedKFs.begin(), vend=mvpCurrentConnectedKFs.end(); vit!=vend; vit++)
+        for(auto pKFi : mvpCurrentConnectedKFs)
         {
-            KeyFrame* pKFi = *vit;
             cv::Mat Tiw = pKFi->GetPose();
             if(pKFi!=mpCurrentKF)      //跳过当前关键帧，因为当前关键帧的位姿已经在前面优化过了，在这里是参考基准
             {
@@ -719,12 +715,12 @@ void LoopClosing::CorrectLoop()
         // Correct all MapPoints obsrved by current keyframe and neighbors, so that they align with the other side of the loop
         // Step 2.2：得到矫正的当前关键帧的共视关键帧位姿后，修正这些共视关键帧的地图点
         // 遍历待矫正的共视关键帧（不包括当前关键帧）
-        for(KeyFrameAndPose::iterator mit=CorrectedSim3.begin(), mend=CorrectedSim3.end(); mit!=mend; mit++)
+        for(auto & mit : CorrectedSim3)
         {
             // 取出当前关键帧连接关键帧
-            KeyFrame* pKFi = mit->first;
+            KeyFrame* pKFi = mit.first;
             // 取出经过位姿传播后的Sim3变换
-            g2o::Sim3 g2oCorrectedSiw = mit->second;
+            g2o::Sim3 g2oCorrectedSiw = mit.second;
             g2o::Sim3 g2oCorrectedSwi = g2oCorrectedSiw.inverse();
             // 取出未经过位姿传播的Sim3变换
             g2o::Sim3 g2oSiw =NonCorrectedSim3[pKFi];
@@ -828,7 +824,7 @@ void LoopClosing::CorrectLoop()
     map<KeyFrame*, set<KeyFrame*> > LoopConnections;
 
     // Step 5.1：遍历当前帧相连关键帧组（一级相连）
-    for(vector<KeyFrame*>::iterator vit=mvpCurrentConnectedKFs.begin(), vend=mvpCurrentConnectedKFs.end(); vit!=vend; vit++)
+    for(auto vit=mvpCurrentConnectedKFs.begin(), vend=mvpCurrentConnectedKFs.end(); vit!=vend; vit++)
     {
         KeyFrame* pKFi = *vit;
         // Step 5.2：得到与当前帧相连关键帧的相连关键帧（二级相连）
@@ -840,14 +836,14 @@ void LoopClosing::CorrectLoop()
         // Step 5.4：取出该帧更新后的连接关系
         LoopConnections[pKFi]=pKFi->GetConnectedKeyFrames();
         // Step 5.5：从连接关系中去除闭环之前的二级连接关系，剩下的连接就是由闭环得到的连接关系
-        for(vector<KeyFrame*>::iterator vit_prev=vpPreviousNeighbors.begin(), vend_prev=vpPreviousNeighbors.end(); vit_prev!=vend_prev; vit_prev++)
+        for(auto & vpPreviousNeighbor : vpPreviousNeighbors)
         {
-            LoopConnections[pKFi].erase(*vit_prev);
+            LoopConnections[pKFi].erase(vpPreviousNeighbor);
         }
         // Step 5.6：从连接关系中去除闭环之前的一级连接关系，剩下的连接就是由闭环得到的连接关系
-        for(vector<KeyFrame*>::iterator vit2=mvpCurrentConnectedKFs.begin(), vend2=mvpCurrentConnectedKFs.end(); vit2!=vend2; vit2++)
+        for(auto & mvpCurrentConnectedKF : mvpCurrentConnectedKFs)
         {
-            LoopConnections[pKFi].erase(*vit2);
+            LoopConnections[pKFi].erase(mvpCurrentConnectedKF);
         }
     }
 
@@ -873,7 +869,7 @@ void LoopClosing::CorrectLoop()
     // Loop closed. Release Local Mapping.
     mpLocalMapper->Release();    
 
-    cout << "Loop Closed!" << endl;
+    LOG(INFO) << "Loop Closed!" << endl;
 
     mLastLoopKFid = mpCurrentKF->mnId;
 }
@@ -892,11 +888,11 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
     ORBmatcher matcher(0.8);
 
     // Step 1 遍历待矫正的当前KF的相连关键帧
-    for(KeyFrameAndPose::const_iterator mit=CorrectedPosesMap.begin(), mend=CorrectedPosesMap.end(); mit!=mend;mit++)
+    for(const auto & mit : CorrectedPosesMap)
     {
-        KeyFrame* pKF = mit->first;
+        KeyFrame* pKF = mit.first;
         // 矫正过的Sim 变换
-        g2o::Sim3 g2oScw = mit->second;
+        g2o::Sim3 g2oScw = mit.second;
         cv::Mat cvScw = Converter::toCvMat(g2oScw);
 
         // Step 2 将mvpLoopMapPoints投影到pKF帧匹配，检查地图点冲突并融合
@@ -966,7 +962,7 @@ void LoopClosing::ResetIfRequested()
  */
 void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 {
-    cout << "Starting Global Bundle Adjustment" << endl;
+    LOG(INFO) << "Starting Global Bundle Adjustment" << endl;
 
     // 记录GBA已经迭代次数,用来检查全局BA过程是否是因为意外结束的
     int idx =  mnFullBAIdx;
@@ -1001,8 +997,8 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
         // 而如果被强行中断的线程退出时新的线程还没有启动,那么上面的条件就不起作用了(虽然概率很小,前面的程序中mbStopGBA置位后很快mnFullBAIdx就++了,保险起见),所以这里要再判断一次
         if(!mbStopGBA)
         {
-            cout << "Global Bundle Adjustment finished" << endl;
-            cout << "Updating map ..." << endl;
+            LOG(INFO) << "Global Bundle Adjustment finished" << endl
+                      << "Updating map ..." << endl;
             mpLocalMapper->RequestStop();
 
             // Wait until Local Mapping has effectively stopped
@@ -1031,9 +1027,8 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
                 const set<KeyFrame*> sChilds = pKF->GetChilds();
                 cv::Mat Twc = pKF->GetPoseInverse();
                 // 遍历当前关键帧的子关键帧
-                for(set<KeyFrame*>::const_iterator sit=sChilds.begin();sit!=sChilds.end();sit++)
+                for(auto pChild : sChilds)
                 {
-                    KeyFrame* pChild = *sit;
                     // mnBAGlobalForKF记录是由于哪个闭环匹配关键帧触发的全局BA,并且已经经过了GBA的优化。
                     if(pChild->mnBAGlobalForKF!=nLoopKF)
                     {
@@ -1102,7 +1097,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
             // 释放
             mpLocalMapper->Release();
 
-            cout << "Map updated!" << endl;
+            LOG(INFO) << "Map updated!" << endl;
         }
 
         mbFinishedGBA = true;
