@@ -1,15 +1,4 @@
 /**
- * @file LoopClosing.cc
- * @author guoqing (1337841346@qq.com)
- * @brief 回环检测线程
- * @version 0.1
- * @date 2019-05-05
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -29,16 +18,16 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <mutex>
+#include <thread>
+
+#include <glog/logging.h>
+
 #include "LoopClosing.h"
 #include "Sim3Solver.h"
 #include "Converter.h"
 #include "Optimizer.h"
 #include "ORBmatcher.h"
-
-#include <mutex>
-#include <thread>
-
-#include <glog/logging.h>
 
 
 namespace ORB_SLAM2
@@ -46,9 +35,23 @@ namespace ORB_SLAM2
 
 // 构造函数
 LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale):
-    mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
-    mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mpMatchedKF(NULL), mLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
-    mbStopGBA(false), mpThreadGBA(NULL), mbFixScale(bFixScale), mnFullBAIdx(0)
+    mbResetRequested(false),
+    mbFinishRequested(false),
+    mbFinished(true),
+    mpMap(pMap),
+    mpKeyFrameDB(pDB),
+    mpORBVocabulary(pVoc),
+    mpMatchedKF(NULL),
+    mLastLoopKFid(0),
+    mbRunningGBA(false),
+    mbFinishedGBA(true),
+    mbStopGBA(false),
+    mpThreadGBA(nullptr),
+    mbFixScale(bFixScale),
+    mnFullBAIdx(0),
+    mpTracker(nullptr),
+    mpLocalMapper(nullptr),
+    mpCurrentKF(nullptr)
 {
     // 连续性阈值
     mnCovisibilityConsistencyTh = 3;

@@ -1,15 +1,4 @@
 /**
- * @file MapDrawer.h
- * @author guoqing (1337841346@qq.com)
- * @brief 绘制地图点
- * @version 0.1
- * @date 2019-02-19
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -32,12 +21,14 @@
 #ifndef MAPDRAWER_H
 #define MAPDRAWER_H
 
-#include"Map.h"
-#include"MapPoint.h"
-#include"KeyFrame.h"
-#include<pangolin/pangolin.h>
-
 #include<mutex>
+
+#include <pangolin/pangolin.h>
+
+#include "Map.h"
+#include "MapPoint.h"
+#include "KeyFrame.h"
+
 
 namespace ORB_SLAM2
 {
@@ -77,12 +68,14 @@ public:
      * @param[in] Tcw 位姿矩阵
      */
     void SetCurrentCameraPose(const cv::Mat &Tcw);
+
     /**
      * @brief 设置参考关键帧
      * 
      * @param[in] pKF 参考关键帧的句柄
      */
     void SetReferenceKeyFrame(KeyFrame *pKF);
+
     /**
      * @brief 将相机位姿mCameraPose由Mat类型转化为OpenGlMatrix类型
      * 

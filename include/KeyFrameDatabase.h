@@ -1,15 +1,4 @@
 /**
- * @file KeyFrameDatabase.h
- * @author guoqing (1337841346@qq.com)
- * @brief 关键帧数据库,用于回环检测和重定位
- * @version 0.1
- * @date 2019-04-25
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -35,12 +24,12 @@
 #include <vector>
 #include <list>
 #include <set>
+#include <mutex>
 
 #include "KeyFrame.h"
 #include "Frame.h"
 #include "ORBVocabulary.h"
 
-#include<mutex>
 
 
 namespace ORB_SLAM2
@@ -58,7 +47,7 @@ public:
    * @brief 构造函数
    * @param[in] voc 词袋模型的字典
    */
-    KeyFrameDatabase(const ORBVocabulary &voc);
+    explicit KeyFrameDatabase(const ORBVocabulary &voc);
 
   /**
    * @brief 根据关键帧的词包，更新数据库的倒排索引

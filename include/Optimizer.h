@@ -1,15 +1,4 @@
 /**
- * @file Optimizer.h
- * @author guoqing (1337841346@qq.com)
- * @brief 优化器，所有用到的优化函数的声明都在这个文件中
- * @version 0.1
- * @date 2019-05-22
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -32,13 +21,14 @@
 #ifndef OPTIMIZER_H
 #define OPTIMIZER_H
 
+#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+
 #include "Map.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
 #include "LoopClosing.h"
 #include "Frame.h"
 
-#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 
 namespace ORB_SLAM2
 {

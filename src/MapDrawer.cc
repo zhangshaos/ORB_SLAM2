@@ -1,15 +1,4 @@
 /**
- * @file MapDrawer.cc
- * @author guoqing (1337841346@qq.com)
- * @brief 绘制地图点
- * @version 0.1
- * @date 2019-02-19
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -29,12 +18,14 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <mutex>
+
+#include <pangolin/pangolin.h>
 
 #include "MapDrawer.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
-#include <pangolin/pangolin.h>
-#include <mutex>
+
 
 namespace ORB_SLAM2
 {
@@ -90,11 +81,11 @@ void MapDrawer::DrawMapPoints()
     glBegin(GL_POINTS);
     glColor3f(1.0,0.0,0.0);
 
-    for(set<MapPoint*>::iterator sit=spRefMPs.begin(), send=spRefMPs.end(); sit!=send; sit++)
+    for(auto spRefMP : spRefMPs)
     {
-        if((*sit)->isBad())
+        if(spRefMP->isBad())
             continue;
-        cv::Mat pos = (*sit)->GetWorldPos();
+        cv::Mat pos = spRefMP->GetWorldPos();
         glVertex3f(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
 
     }
@@ -187,12 +178,12 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
             cv::Mat Ow = vpKFs[i]->GetCameraCenter();
             if(!vCovKFs.empty())
             {
-                for(vector<KeyFrame*>::const_iterator vit=vCovKFs.begin(), vend=vCovKFs.end(); vit!=vend; vit++)
+                for(auto vCovKF : vCovKFs)
                 {
                     //单向绘制
-                    if((*vit)->mnId<vpKFs[i]->mnId)
+                    if(vCovKF->mnId<vpKFs[i]->mnId)
                         continue;
-                    cv::Mat Ow2 = (*vit)->GetCameraCenter();
+                    cv::Mat Ow2 = vCovKF->GetCameraCenter();
                     glVertex3f(Ow.at<float>(0),Ow.at<float>(1),Ow.at<float>(2));
                     glVertex3f(Ow2.at<float>(0),Ow2.at<float>(1),Ow2.at<float>(2));
                 }
@@ -200,7 +191,7 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 
             // Spanning tree
             // step 3.2 连接最小生成树 (PS: 我觉得这里并不是权值最小,而是其中的边对于其他的图来讲是最少的)
-            //TODO 这个部分的理论知识还不是很了解
+            // 这个部分的理论知识还不是很了解
             KeyFrame* pParent = vpKFs[i]->GetParent();
             if(pParent)
             {
@@ -211,13 +202,13 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 
             // Loops
             // step 3.3 连接闭环时形成的连接关系
-            //TODO 这个部分也不是非常明白
+            // 这个部分也不是非常明白
             set<KeyFrame*> sLoopKFs = vpKFs[i]->GetLoopEdges();
-            for(set<KeyFrame*>::iterator sit=sLoopKFs.begin(), send=sLoopKFs.end(); sit!=send; sit++)
+            for(auto sLoopKF : sLoopKFs)
             {
-                if((*sit)->mnId<vpKFs[i]->mnId)
+                if(sLoopKF->mnId<vpKFs[i]->mnId)
                     continue;
-                cv::Mat Owl = (*sit)->GetCameraCenter();
+                cv::Mat Owl = sLoopKF->GetCameraCenter();
                 glVertex3f(Ow.at<float>(0),Ow.at<float>(1),Ow.at<float>(2));
                 glVertex3f(Owl.at<float>(0),Owl.at<float>(1),Owl.at<float>(2));
             }

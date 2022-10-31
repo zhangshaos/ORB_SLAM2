@@ -18,16 +18,6 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
-/**
- * @file Converter.cc
- * @author guoqing (1337841346@qq.com)
- * @brief ORB-SLAM2中一些常用的转换的实现
- * @version 0.1
- * @date 2019-01-03
- * 
- * @copyright Copyright (c) 2019
- * 
- */
 
 
 #include "Converter.h"
@@ -39,16 +29,16 @@ namespace ORB_SLAM2
 //将描述子转换为描述子向量，其实本质上是cv:Mat->std:vector
 std::vector<cv::Mat> Converter::toDescriptorVector(const cv::Mat &Descriptors)
 {
-	//存储转换结果的向量
+	  //存储转换结果的向量
     std::vector<cv::Mat> vDesc;
-	//创建保留空间
+	  //创建保留空间
     vDesc.reserve(Descriptors.rows);
-	//对于每一个特征点的描述子
+	  //对于每一个特征点的描述子
     for (int j=0;j<Descriptors.rows;j++)
-		//从描述子这个矩阵中抽取出来存到向量中
+		    //从描述子这个矩阵中抽取出来存到向量中
         vDesc.push_back(Descriptors.row(j));
 	
-	//返回转换结果
+	  //返回转换结果
     return vDesc;
 }
 
@@ -56,16 +46,16 @@ std::vector<cv::Mat> Converter::toDescriptorVector(const cv::Mat &Descriptors)
 //将变换矩阵转换为李代数se3：cv:Mat->g2o::SE3Quat
 g2o::SE3Quat Converter::toSE3Quat(const cv::Mat &cvT)
 {
-	//首先将旋转矩阵提取出来
+	  //首先将旋转矩阵提取出来
     Eigen::Matrix<double,3,3> R;
     R << cvT.at<float>(0,0), cvT.at<float>(0,1), cvT.at<float>(0,2),
          cvT.at<float>(1,0), cvT.at<float>(1,1), cvT.at<float>(1,2),
          cvT.at<float>(2,0), cvT.at<float>(2,1), cvT.at<float>(2,2);
 
-	//然后将平移向量提取出来
+	  //然后将平移向量提取出来
     Eigen::Matrix<double,3,1> t(cvT.at<float>(0,3), cvT.at<float>(1,3), cvT.at<float>(2,3));
 
-	//构造g2o::SE3Quat类型并返回
+	  //构造g2o::SE3Quat类型并返回
     return g2o::SE3Quat(R,t);
 }
 

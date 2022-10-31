@@ -1,15 +1,4 @@
 /**
- * @file Sim3Solver.h
- * @author guoqing (1337841346@qq.com)
- * @brief sim3 求解
- * @version 0.1
- * @date 2019-05-07
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -33,8 +22,9 @@
 #ifndef SIM3SOLVER_H
 #define SIM3SOLVER_H
 
-#include <opencv2/opencv.hpp>
 #include <vector>
+
+#include <opencv2/opencv.hpp>
 
 #include "KeyFrame.h"
 
@@ -202,10 +192,6 @@ protected:
 
     // RANSAC max iterations
     int mRansacMaxIts;                          // RANSAC 结束的不理想条件: 最大迭代次数
-
-    // Threshold inlier/outlier. e = dist(Pi,T_ij*Pj)^2 < 5.991*mSigma2
-    float mTh;                                  // 没有使用到的变量
-    float mSigma2;                              // 没有使用到的变量
 
     // Calibration
     cv::Mat mK1;                                // 当前关键帧的内参矩阵

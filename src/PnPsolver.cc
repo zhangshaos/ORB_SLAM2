@@ -1,15 +1,4 @@
 /**
- * @file PnPsolver.cc
- * @author guoqing (1337841346@qq.com)
- * @brief EPnP 相机位姿求解器
- * @version 0.1
- * @date 2019-05-08
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 * This file is a modified version of EPnP <http://cvlab.epfl.ch/EPnP/index.php>, see FreeBSD license below.
 *
@@ -96,14 +85,15 @@
 
 
 #include <iostream>
-
-#include "PnPsolver.h"
-
 #include <vector>
 #include <cmath>
-#include <opencv2/core/core.hpp>
-#include "Thirdparty/DBoW2/DUtils/Random.h"
 #include <algorithm>
+
+#include <opencv2/core/core.hpp>
+#include <glog/logging.h>
+
+#include "Thirdparty/DBoW2/DUtils/Random.h"
+#include "PnPsolver.h"
 
 using namespace std;
 
@@ -119,8 +109,22 @@ namespace ORB_SLAM2
 // 构造函数
 PnPsolver::PnPsolver(const Frame &F, const vector<MapPoint*> &vpMapPointMatches):
     pws(0), us(0), alphas(0), pcs(0), //这里的四个变量都是指针啊,直接这样子写的原因可以参考函数 set_maximum_number_of_correspondences()
-    maximum_number_of_correspondences(0), number_of_correspondences(0), mnInliersi(0),
-    mnIterations(0), mnBestInliers(0), N(0)
+    maximum_number_of_correspondences(0),
+    number_of_correspondences(0),
+    mnInliersi(0),
+    mnIterations(0),
+    mnBestInliers(0),
+    N(0),
+    cws(),
+    ccs(),
+    mRi(),
+    mti(),
+    mnRefinedInliers(0),
+    mRansacProb(0.0),
+    mRansacMinInliers(0),
+    mRansacMaxIts(0),
+    mRansacEpsilon(0.f),
+    mRansacMinSet(0)
 {
     // 根据点数初始化容器的大小
     mvpMapPointMatches = vpMapPointMatches;           //匹配关系
@@ -1413,7 +1417,7 @@ void PnPsolver::qr_solve(CvMat * A, CvMat * b, CvMat * X)
     if (eta == 0) 
     {
       A1[k] = A2[k] = 0.0;
-      cerr << "God damnit, A is singular, this shouldn't happen." << endl;
+      LOG(ERROR) << "God damnit, A is singular, this shouldn't happen." << endl;
       return;
     } 
     else

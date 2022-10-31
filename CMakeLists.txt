@@ -49,6 +49,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
         ${PROJECT_SOURCE_DIR}
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_SOURCE_DIR}/Thirdparty
+        ${PROJECT_SOURCE_DIR}/Thirdparty/Sophus
         ${EIGEN3_INCLUDE_DIR}
         ${Pangolin_INCLUDE_DIRS}
         )

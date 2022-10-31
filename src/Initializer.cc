@@ -18,16 +18,6 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
-/**
- * @file Initializer.cc
- * @author guoqing (1337841346@qq.com)
- * @brief 单目初始化的实现文件
- * @version 0.1
- * @date 2019-01-11
- * 
- * @copyright Copyright (c) 2019
- * 
- */
 
 #include "Initializer.h"
 
@@ -37,7 +27,7 @@
 #include "ORBmatcher.h"
 
 //这里使用到了多线程的加速技术
-#include<thread>
+#include <thread>
 
 namespace ORB_SLAM2
 {

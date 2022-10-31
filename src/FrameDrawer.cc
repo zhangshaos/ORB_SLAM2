@@ -1,15 +1,4 @@
 /**
- * @file FrameDrawer.cc
- * @author guoqing (1337841346@qq.com)
- * @brief 帧绘制器
- * @version 0.1
- * @date 2019-02-19
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -29,25 +18,29 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-#include "FrameDrawer.h"
-#include "Tracking.h"
+#include <mutex>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-#include<mutex>
+#include "FrameDrawer.h"
+#include "Tracking.h"
+
 
 namespace ORB_SLAM2
 {
 //构造函数
-FrameDrawer::FrameDrawer(Map* pMap):mpMap(pMap)
+FrameDrawer::FrameDrawer(Map* pMap):
+  mpMap(pMap),
+  N(0),
+  mnTracked(0),
+  mnTrackedVO(0)
 {
     mState=Tracking::SYSTEM_NOT_READY;
     // 初始化图像显示画布
     // 包括：图像、特征点连线形成的轨迹（初始化时）、框（跟踪时的MapPoint）、圈（跟踪时的特征点）
     // ！！！固定画布大小为640*480
-    mIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
+    mIm = cv::Mat(480, 640, CV_8UC3, cv::Scalar(0,0,0));
 }
 
 // 准备需要显示的信息，包括图像、特征点、地图、跟踪状态
@@ -174,10 +167,7 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
         s << " TRYING TO INITIALIZE ";
     else if(nState==Tracking::OK)
     {
-        if(!mbOnlyTracking)
-            s << "SLAM MODE |  ";
-        else
-            s << "LOCALIZATION | ";
+        s << "LOCALIZATION | ";
         int nKFs = mpMap->KeyFramesInMap();
         int nMPs = mpMap->MapPointsInMap();
         s << "KFs: " << nKFs << ", MPs: " << nMPs << ", Matches: " << mnTracked;
@@ -235,8 +225,6 @@ void FrameDrawer::Update(Tracking *pTracker)
     N = mvCurrentKeys.size();
     mvbVO = vector<bool>(N,false);
     mvbMap = vector<bool>(N,false);
-
-    mbOnlyTracking = pTracker->mbOnlyTracking;
 
     //如果上一帧的时候,追踪器没有进行初始化
     if(pTracker->mLastProcessedState==Tracking::NOT_INITIALIZED)

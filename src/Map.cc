@@ -1,15 +1,4 @@
 /**
- * @file Map.cc
- * @author guoqing (1337841346@qq.com)
- * @brief 地图的实现
- * @version 0.1
- * @date 2019-02-26
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -32,13 +21,12 @@
 
 #include "Map.h"
 
-#include<mutex>
 
 namespace ORB_SLAM2
 {
 
 //构造函数,地图点中最大关键帧id归0
-Map::Map():mnMaxKFid(0)
+Map::Map() : mnMaxKFid(0), mnBigChangeIdx(0)
 {
 }
 
@@ -76,8 +64,8 @@ void Map::EraseMapPoint(MapPoint *pMP)
     unique_lock<mutex> lock(mMutexMap);
     mspMapPoints.erase(pMP);
 
-    //下面是作者加入的注释. 实际上只是从std::set中删除了地图点的指针, 原先地图点
-    //占用的内存区域并没有得到释放
+    // 下面是作者加入的注释. 实际上只是从std::set中删除了地图点的指针, 原先地图点
+    // 占用的内存区域并没有得到释放
     // TODO: This only erase the pointer.
     // Delete the MapPoint
 }
@@ -89,7 +77,7 @@ void Map::EraseMapPoint(MapPoint *pMP)
 void Map::EraseKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexMap);
-    //是的,根据值来删除地图点
+    // 是的,根据值来删除地图点
     mspKeyFrames.erase(pKF);
 
     // TODO: This only erase the pointer.
@@ -126,14 +114,14 @@ int Map::GetLastBigChangeIdx()
 vector<KeyFrame*> Map::GetAllKeyFrames()
 {
     unique_lock<mutex> lock(mMutexMap);
-    return vector<KeyFrame*>(mspKeyFrames.begin(),mspKeyFrames.end());
+    return std::vector<KeyFrame*>(mspKeyFrames.begin(),mspKeyFrames.end());
 }
 
 //获取地图中的所有地图点
 vector<MapPoint*> Map::GetAllMapPoints()
 {
     unique_lock<mutex> lock(mMutexMap);
-    return vector<MapPoint*>(mspMapPoints.begin(),mspMapPoints.end());
+    return std::vector<MapPoint*>(mspMapPoints.begin(),mspMapPoints.end());
 }
 
 //获取地图点数目
@@ -167,11 +155,11 @@ long unsigned int Map::GetMaxKFid()
 //清空地图中的数据
 void Map::clear()
 {
-    for(auto mspMapPoint : mspMapPoints)
-        delete mspMapPoint;
+    for(auto mp : mspMapPoints)
+        delete mp;
 
-    for(auto mspKeyFrame : mspKeyFrames)
-        delete mspKeyFrame;
+    for(auto kf : mspKeyFrames)
+        delete kf;
 
     mspMapPoints.clear();
     mspKeyFrames.clear();

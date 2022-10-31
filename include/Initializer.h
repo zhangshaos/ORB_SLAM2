@@ -19,20 +19,11 @@
 */
 
 
-/**
- * @file Initializer.h
- * @author guoqing (1337841346@qq.com)
- * @brief 单目初始化部分的声明. 双目 和RGBD输入的情况下,不会使用这个类
- * @version 0.1
- * @date 2019-01-11
- * 
- * @copyright Copyright (c) 2019
- * 
- */
 #ifndef INITIALIZER_H
 #define INITIALIZER_H
 
-#include<opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>
+
 #include "Frame.h"
 
 
@@ -40,9 +31,6 @@ namespace ORB_SLAM2
 {
 
 // THIS IS THE INITIALIZER FOR MONOCULAR SLAM. NOT USED IN THE STEREO OR RGBD CASE.
-/**
- * @brief 单目SLAM初始化相关，双目和RGBD不会使用这个类
- */
 class Initializer
 {
     typedef pair<int,int> Match;
@@ -57,9 +45,9 @@ public:
      * @param[in] sigma                 测量误差
      * @param[in] iterations            RANSAC迭代次数
      */
-    Initializer(const Frame &ReferenceFrame,    
-                float sigma = 1.0,              
-                int iterations = 200);          
+    explicit Initializer(const Frame &ReferenceFrame,
+                         float sigma = 1.0,
+                         int iterations = 200);
 
     // Computes in parallel a fundamental matrix and a homography
     // Selects a model and tries to recover the motion and the structure from motion
@@ -74,10 +62,10 @@ public:
      * @param[in] vMatches12            当前帧（2）和参考帧（1）图像中特征点的匹配关系
      *                                  vMatches12[i]解释：i表示帧1中关键点的索引值，vMatches12[i]的值为帧2的关键点索引值
      *                                  没有匹配关系的话，vMatches12[i]值为 -1
-     * @param[in & out] R21                   相机从参考帧到当前帧的旋转
-     * @param[in & out] t21                   相机从参考帧到当前帧的平移
-     * @param[in & out] vP3D                  三角化测量之后的三维地图点
-     * @param[in & out] vbTriangulated        标记三角化点是否有效，有效为true
+     * @param[in & out] R21             相机从参考帧到当前帧的旋转
+     * @param[in & out] t21             相机从参考帧到当前帧的平移
+     * @param[in & out] vP3D            三角化测量之后的三维地图点
+     * @param[in & out] vbTriangulated  标记三角化点是否有效，有效为true
      * @return true                     该帧可以成功初始化，返回true
      * @return false                    该帧不满足初始化条件，返回false
      */

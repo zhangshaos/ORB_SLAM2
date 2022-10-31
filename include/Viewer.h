@@ -1,15 +1,4 @@
 /**
- * @file Viewer.h
- * @author guoqing (1337841346@qq.com)
- * @brief 可视化查看器的声明
- * @version 0.1
- * @date 2019-02-19
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -33,12 +22,13 @@
 #ifndef VIEWER_H
 #define VIEWER_H
 
+#include <mutex>
+
 #include "FrameDrawer.h"
 #include "MapDrawer.h"
 #include "Tracking.h"
 #include "System.h"
 
-#include <mutex>
 
 namespace ORB_SLAM2
 {

@@ -1,14 +1,3 @@
-       /**
- * @file PnPsolver.h
- * @author guoqing (1337841346@qq.com)
- * @brief EPnP 相机位姿求解器，貌似这里ORB-SLAM2也是使用了开源的代码
- * @version 0.1
- * @date 2019-05-08
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
 /**
 * This file is part of ORB-SLAM2.
 * This file is a modified version of EPnP <http://cvlab.epfl.ch/EPnP/index.php>, see FreeBSD license below.
@@ -67,6 +56,7 @@
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/types_c.h>
+
 #include "MapPoint.h"
 #include "Frame.h"
 
@@ -340,7 +330,6 @@ public:
 
   double cws[4][3],                                               // 存储控制点在世界坐标系下的坐标，第一维表示是哪个控制点，第二维表示是哪个坐标(x,y,z)
          ccs[4][3];                                               // 存储控制点在相机坐标系下的坐标, 含义同上
-  double cws_determinant;                                         // 没有被使用到的变量,但是看变量名字,应该是用于存储某个矩阵的行列式值的
 
   vector<MapPoint*> mvpMapPointMatches;                           // 存储构造的时候给出的地图点 
 
@@ -389,9 +378,6 @@ public:
 
   // RANSAC expected inliers/total ratio
   float mRansacEpsilon;                                           // RANSAC中,最小内点数占全部点个数的比例
-
-  // RANSAC Threshold inlier/outlier. Max error e = dist(P1,T_12*P2)^2
-  float mRansacTh;                                                // 在程序中并没有使用到的变量
 
   // RANSAC Minimun Set used at each iteration
   int mRansacMinSet;                                              // 为每次RANSAC需要的特征点数，默认为4组3D-2D对应点. 参与到最少内点数的确定过程中

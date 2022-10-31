@@ -1,15 +1,4 @@
 /**
- * @file ORBmatcher.h
- * @author guoqing (1337841346@qq.com)
- * @brief 处理数据关联问题
- * @version 0.1
- * @date 2019-04-26
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -34,6 +23,7 @@
 #define ORBMATCHER_H
 
 #include <vector>
+
 #include <opencv2/core/core.hpp>
 #include <opencv2/features2d/features2d.hpp>
 
@@ -109,9 +99,9 @@ public:
      * @param[in] CurrentFrame      当前帧
      * @param[in] pKF               关键帧
      * @param[in] sAlreadyFound     已经寻找得到的地图点
-     * @param[in] th                //窗口大小的阈值
-     * @param[in] ORBdist           //描述子最小距离阈值
-     * @return int                  //匹配到的点的数目
+     * @param[in] th                窗口大小的阈值
+     * @param[in] ORBdist           描述子最小距离阈值
+     * @return int                  匹配到的点的数目
      */
     int SearchByProjection(Frame &CurrentFrame, KeyFrame* pKF, const std::set<MapPoint*> &sAlreadyFound, const float th, const int ORBdist);
 

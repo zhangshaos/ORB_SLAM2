@@ -19,30 +19,15 @@
 */
 
 
-/**
- * @file  Converter.h
- * @author guoqing (1337841346@qq.com)
- * @brief 提供了一系列的常见转换。\n
- * orb中以cv::Mat为基本存储结构，到g2o和Eigen需要一个转换。
- * 这些转换都很简单，整个文件可以单独从orbslam里抽出来而不影响其他功能.
- * @version 0.1
- * @date 2019-01-03
- */
-
 #ifndef CONVERTER_H
 #define CONVERTER_H
 
-#include<opencv2/core/core.hpp>
+#include <opencv2/core/core.hpp>
+#include <Eigen/Dense>
+#include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
+#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 
-#include<Eigen/Dense>
-#include"Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
-#include"Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 
-/**
- * @brief ORB-SLAM2 自定义的命名空间。 
- * @details 该命名空间中包含了所有的ORB-SLAM2的组件。
- * 
- */
 namespace ORB_SLAM2
 {
 
@@ -78,13 +63,14 @@ public:
      * @return g2o::SE3Quat 将以g2o::SE3Quat格式存储的位姿
      */
     static g2o::SE3Quat toSE3Quat(const cv::Mat &cvT);
+
     /**
      * @brief 将以g2o::Sim3格式存储的位姿转换成为g2o::SE3Quat类型
      * 
      * @param[in] gSim3 以g2o::Sim3格式存储的位姿
      * @return g2o::SE3Quat 
      */
-    static g2o::SE3Quat toSE3Quat(const g2o::Sim3 &gSim3);
+    // static g2o::SE3Quat toSE3Quat(const g2o::Sim3 &gSim3);
     
     /** @} */
 

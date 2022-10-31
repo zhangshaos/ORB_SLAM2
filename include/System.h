@@ -18,9 +18,6 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
-/*
-这个头文件定义了ORB-SLAM2的主线程（或者称之为系统）结构，其他的各个模块都是由这里开始被调用的。
-*/
 
 
 #ifndef SYSTEM_H
@@ -29,7 +26,9 @@
 //一些公用库的支持，字符串操作，多线程操作，以及opencv库等
 #include <string>
 #include <thread>
+#include <optional>
 #include <opencv2/core/core.hpp>
+#include <sophus/geometry.hpp>
 
 //下面则是本ORB-SLAM2系统中的其他模块
 #include "Tracking.h"
@@ -59,7 +58,7 @@ class System
 public:
     // Input sensor
     //这个枚举类型用于 表示本系统所使用的传感器类型
-    enum eSensor{
+    enum eSensor {
         MONOCULAR=0,
         STEREO=1,
         RGBD=2
@@ -77,35 +76,15 @@ public:
     //下面是针对三种不同类型的传感器所设计的三种运动追踪接口。彩色图像为CV_8UC3类型，并且都将会被转换成为灰度图像。
     //追踪接口返回估计的相机位姿，如果追踪失败则返回NULL
 
-    // Proccess the given stereo frame. Images must be synchronized and rectified（校正）.
-    // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
-    // Returns the camera pose (empty if tracking fails).
-    // NOTE 注意这里英文注释的说法，双目图像有同步和校准的概念。
-    cv::Mat TrackStereo(const cv::Mat &imLeft,          //左目图像
-                        const cv::Mat &imRight,         //右目图像
-                        const double &timestamp);       //时间戳
-
-    // Process the given rgbd frame. Depthmap must be registered to the RGB frame.
-    // Input image: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
-    // Input depthmap: Float (CV_32F).
-    // Returns the camera pose (empty if tracking fails).
-    // NOTE 而在这里对RGBD图像的说法则是“配准”
-    cv::Mat TrackRGBD(const cv::Mat &im,                //彩色图像
-                      const cv::Mat &depthmap,          //深度图像
-                      const double &timestamp);         //时间戳
-
     // Proccess the given monocular frame
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
     // Returns the camera pose (empty if tracking fails).
     cv::Mat TrackMonocular(const cv::Mat &im,           //图像
                            const double &timestamp);    //时间戳
 
-    // This stops local mapping thread (map building) and performs only camera tracking.
-    //使能定位模式，此时仅有运动追踪部分在工作，局部建图功能则不工作
-    void ActivateLocalizationMode();
-    // This resumes local mapping thread and performs SLAM again.
-    //反之同上
-    void DeactivateLocalizationMode();
+    std::optional<Sophus::SE3d> TrackMonocularWithPose(const cv::Mat &im,
+                                                       double timestamp,
+                                                       const Sophus::SE3d& pose);
 
     // Returns true if there have been a big map change (loop closure, global BA)
     // since last call to this function
@@ -155,13 +134,8 @@ public:
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
 
 private:
-
     //注意变量命名方式，类的变量有前缀m，如果这个变量是指针类型还要多加个前缀p，
-    //如果是进程那么加个前缀t
-
-    // Input sensor
-    // 传感器类型
-    eSensor mSensor;
+    //如果是线程那么加个前缀t
 
     // ORB vocabulary used for place recognition and feature matching.
     // 一个指针指向ORB字典
@@ -211,12 +185,6 @@ private:
     //复位标志，注意这里目前还不清楚为什么要定义为std::mutex类型
     std::mutex mMutexReset;
     bool mbReset;
-
-    // Change mode flags
-    //模式改变标志
-    std::mutex mMutexMode;
-    bool mbActivateLocalizationMode;
-    bool mbDeactivateLocalizationMode;
 
     // Tracking state
     // 追踪状态标志，注意前三个的类型和上面的函数类型相互对应

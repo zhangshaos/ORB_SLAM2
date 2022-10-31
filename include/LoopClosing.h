@@ -1,15 +1,4 @@
 /**
- * @file LoopClosing.h
- * @author guoqing (1337841346@qq.com)
- * @brief 回环检测线程
- * @version 0.1
- * @date 2019-05-05
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -32,17 +21,18 @@
 #ifndef LOOPCLOSING_H
 #define LOOPCLOSING_H
 
+#include <thread>
+#include <mutex>
+
+#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+
 #include "KeyFrame.h"
 #include "LocalMapping.h"
 #include "Map.h"
 #include "ORBVocabulary.h"
 #include "Tracking.h"
-
 #include "KeyFrameDatabase.h"
 
-#include <thread>
-#include <mutex>
-#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 
 namespace ORB_SLAM2
 {

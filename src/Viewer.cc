@@ -1,15 +1,4 @@
 /**
- * @file Viewer.cc
- * @author guoqing (1337841346@qq.com)
- * @brief 查看器的实现
- * @version 0.1
- * @date 2019-02-19
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -30,12 +19,12 @@
 */
 
 
+#include <mutex>
 
-
-#include "Viewer.h"
 #include <pangolin/pangolin.h>
 
-#include <mutex>
+#include "Viewer.h"
+
 
 namespace ORB_SLAM2
 {
@@ -159,18 +148,6 @@ void Viewer::Run()
             bFollow = false;
         }
 
-        //更新定位模式或者是SLAM模式
-        if(menuLocalizationMode && !bLocalizationMode)
-        {
-            mpSystem->ActivateLocalizationMode();
-            bLocalizationMode = true;
-        }
-        else if(!menuLocalizationMode && bLocalizationMode)
-        {
-            mpSystem->DeactivateLocalizationMode();
-            bLocalizationMode = false;
-        }
-
         d_cam.Activate(s_cam);
         // step 3：绘制地图和图像(3D部分)
         // 设置为白色，glClearColor(red, green, blue, alpha），数值范围(0, 1)
@@ -201,8 +178,6 @@ void Viewer::Run()
             menuShowKeyFrames = true;
             menuShowPoints = true;
             menuLocalizationMode = false;
-            if(bLocalizationMode)
-                mpSystem->DeactivateLocalizationMode();
             //相关变量也恢复到初始状态
             bLocalizationMode = false;
             bFollow = true;
@@ -219,9 +194,8 @@ void Viewer::Run()
             //就不再绘图了,并且在这里每隔三秒检查一下是否结束
             while(isStopped())
             {
-				//usleep(3000);
-				std::this_thread::sleep_for(std::chrono::milliseconds(3));
-
+                // usleep(3000);
+                std::this_thread::sleep_for(std::chrono::milliseconds(3));
             }
         }
 

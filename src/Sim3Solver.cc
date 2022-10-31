@@ -1,15 +1,4 @@
 /**
- * @file Sim3Solver.cc
- * @author guoqing (1337841346@qq.com)
- * @brief sim3 求解器
- * @version 0.1
- * @date 2019-05-07
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -30,16 +19,16 @@
 */
 
 
-#include "Sim3Solver.h"
-
 #include <vector>
 #include <cmath>
+
 #include <opencv2/core/core.hpp>
+#include "Thirdparty/DBoW2/DUtils/Random.h"
 
 #include "KeyFrame.h"
 #include "ORBmatcher.h"
+#include "Sim3Solver.h"
 
-#include "Thirdparty/DBoW2/DUtils/Random.h"
 
 namespace ORB_SLAM2
 {
@@ -52,7 +41,16 @@ namespace ORB_SLAM2
  * @param[in] bFixScale         当前传感器类型的输入需不需要计算尺度。单目的时候需要，双目和RGBD的时候就不需要了
  */
 Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const vector<MapPoint *> &vpMatched12, const bool bFixScale):
-    mnIterations(0), mnBestInliers(0), mbFixScale(bFixScale)
+    mnIterations(0),
+    mnBestInliers(0),
+    mbFixScale(bFixScale),
+    N(0),
+    ms12i(0.f),
+    mnInliersi(0),
+    mBestScale(0.f),
+    mRansacProb(0.0),
+    mRansacMinInliers(0),
+    mRansacMaxIts(0)
 {
     mpKF1 = pKF1;       // 当前关键帧
     mpKF2 = pKF2;       // 闭环关键帧
@@ -111,8 +109,8 @@ Sim3Solver::Sim3Solver(KeyFrame *pKF1, KeyFrame *pKF2, const vector<MapPoint *> 
             const float sigmaSquare2 = pKF2->mvLevelSigma2[kp2.octave];
 
 	        // 自由度为2的卡方分布，显著性水平为0.01，对应的临界阈值为9.21
-            mvnMaxError1.push_back(9.210*sigmaSquare1);
-            mvnMaxError2.push_back(9.210*sigmaSquare2);
+            mvnMaxError1.push_back(9.210 * sigmaSquare1);
+            mvnMaxError2.push_back(9.210 * sigmaSquare2);
 
             // mvpMapPoints1和mvpMapPoints2是匹配的MapPoints容器
             mvpMapPoints1.push_back(pMP1);

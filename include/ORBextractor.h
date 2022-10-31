@@ -23,6 +23,7 @@
 
 #include <vector>
 #include <list>
+
 #include <opencv2/imgcodecs/legacy/constants_c.h>
 
 
@@ -54,16 +55,16 @@ public:
      */
     void DivideNode(ExtractorNode &n1, ExtractorNode &n2, ExtractorNode &n3, ExtractorNode &n4);
 
-	///保存有当前节点的特征点
+    //保存有当前节点的特征点
     std::vector<cv::KeyPoint> vKeys;
-	///当前节点所对应的图像坐标边界
+    //当前节点所对应的图像坐标边界
     cv::Point2i UL, UR, BL, BR;
-	//存储提取器节点的列表（其实就是双向链表）的一个迭代器,可以参考[http://www.runoob.com/cplusplus/cpp-overloading.html]
-	//这个迭代器提供了访问总节点列表的方式，需要结合cpp文件进行分析
+	  //存储提取器节点的列表（其实就是双向链表）的一个迭代器,可以参考[http://www.runoob.com/cplusplus/cpp-overloading.html]
+	  //这个迭代器提供了访问总节点列表的方式，需要结合cpp文件进行分析
     std::list<ExtractorNode>::iterator lit;
 	
-	///如果节点中只有一个特征点的话，说明这个节点不能够再进行分裂了，这个标志置位
-	//这个节点中如果没有特征点的话，这个节点就直接被删除了
+	  //如果节点中只有一个特征点的话，说明这个节点不能够再进行分裂了，这个标志置位
+	  //这个节点中如果没有特征点的话，这个节点就直接被删除了
     bool bNoMore;
 };
 
@@ -76,7 +77,7 @@ public:
 class ORBextractor
 {
 public:
-    //TODO 但是在程序中好像并没有被用到
+    // 在程序中好像并没有被用到
 	///定义一个枚举类型用于表示使用HARRIS响应值还是使用FAST响应值
     enum {HARRIS_SCORE=0, FAST_SCORE=1 };
 
@@ -110,7 +111,7 @@ public:
      */
     void operator()(cv::InputArray image, cv::InputArray mask, std::vector<cv::KeyPoint>& keypoints,cv::OutputArray descriptors);
 
-	//下面的这些内联函数都是用来直接获取类的成员变量的
+	  //下面的这些内联函数都是用来直接获取类的成员变量的
 	
     /**
      * @brief 获取图像金字塔的层数
@@ -128,7 +129,8 @@ public:
      * @brief 获取图像金字塔中每个图层相对于底层图像的缩放因子
      * @return std::vector<float> 图像金字塔中每个图层相对于底层图像的缩放因子
      */
-    std::vector<float> inline GetScaleFactors(){
+    std::vector<float> inline GetScaleFactors()
+    {
         return mvScaleFactor;
     }
 
@@ -136,7 +138,8 @@ public:
      * @brief 获取上面的那个缩放因子s的倒数
      * @return std::vector<float> 倒数
      */
-    std::vector<float> inline GetInverseScaleFactors(){
+    std::vector<float> inline GetInverseScaleFactors()
+    {
         return mvInvScaleFactor;
     }
     
@@ -144,7 +147,8 @@ public:
      * @brief 获取sigma^2，就是每层图像相对于初始图像缩放因子的平方，参考cpp文件中类构造函数的操作
      * @return std::vector<float> sigma^2
      */
-    std::vector<float> inline GetScaleSigmaSquares(){
+    std::vector<float> inline GetScaleSigmaSquares()
+    {
         return mvLevelSigma2;
     }
 
@@ -152,7 +156,8 @@ public:
      * @brief 获取上面sigma平方的倒数
      * @return std::vector<float> 
      */
-    std::vector<float> inline GetInverseScaleSigmaSquares(){
+    std::vector<float> inline GetInverseScaleSigmaSquares()
+    {
         return mvInvLevelSigma2;
     }
 
@@ -161,7 +166,7 @@ public:
 
 protected:
 	
-	//下面这些都是保护成员哟
+	  //下面这些都是保护成员哟
 
     /**
      * @brief 针对给出的一张图像，计算其图像金字塔
@@ -191,30 +196,23 @@ protected:
 		const std::vector<cv::KeyPoint>& vToDistributeKeys, const int &minX, const int &maxX, const int &minY, const int &maxY, 
 		const int &nFeatures, const int &level);
 
-    /**
-     * @brief 这是使用另外一种老办法提取并平均特征点的方法，但是在实际的程序中并没有用到
-     * @param[out] allKeypoints 提取到的特征点
-     */
-    void ComputeKeyPointsOld(std::vector<std::vector<cv::KeyPoint> >& allKeypoints);
 
-    //NOTE 作者不地道啊，这里是类的成员变量，说好的变量名的m前缀呢？
-
-    std::vector<cv::Point> pattern;             ///<用于计算描述子的随机采样点集合
+    std::vector<cv::Point> pattern;         ///<用于计算描述子的随机采样点集合
 
     int nfeatures;			                    ///<整个图像金字塔中，要提取的特征点数目
-    double scaleFactor;		                    ///<图像金字塔层与层之间的缩放因子
-    int nlevels;			                    ///<图像金字塔的层数
+    double scaleFactor;		                  ///<图像金字塔层与层之间的缩放因子
+    int nlevels;			                      ///<图像金字塔的层数
     int iniThFAST;			                    ///<初始的FAST响应值阈值
     int minThFAST;			                    ///<最小的FAST响应值阈值
 
     std::vector<int> mnFeaturesPerLevel;		///<分配到每层图像中，要提取的特征点数目
 
-    std::vector<int> umax;	                    ///<计算特征点方向的时候，有个圆形的图像区域，这个vector中存储了每行u轴的边界（四分之一，其他部分通过对称获得）
+    std::vector<int> umax;	                ///<计算特征点方向的时候，有个圆形的图像区域，这个vector中存储了每行u轴的边界（四分之一，其他部分通过对称获得）
 
     std::vector<float> mvScaleFactor;		    ///<每层图像的缩放因子
     std::vector<float> mvInvScaleFactor;        ///<以及每层缩放因子的倒数
     std::vector<float> mvLevelSigma2;		    ///<存储每层的sigma^2,即上面每层图像相对于底层图像缩放倍数的平方
-    std::vector<float> mvInvLevelSigma2;	    ///<sigma平方的倒数
+    std::vector<float> mvInvLevelSigma2;	  ///<sigma平方的倒数
 };
 
 } //namespace ORB_SLAM

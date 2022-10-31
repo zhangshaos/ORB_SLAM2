@@ -1,15 +1,4 @@
 /**
- * @file KeyFrame.cc
- * @author guoqing (1337841346@qq.com)
- * @brief 关键帧
- * @version 0.1
- * @date 2019-04-24
- * 
- * @copyright Copyright (c) 2019
- * 
- */
-
-/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -29,33 +18,59 @@
 * along with ORB-SLAM2. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include<mutex>
+
 #include "KeyFrame.h"
 #include "Converter.h"
 #include "ORBmatcher.h"
-#include<mutex>
+
 
 namespace ORB_SLAM2
 {
 
 // 下一个关键帧的id
-long unsigned int KeyFrame::nNextId=0;
+long unsigned int KeyFrame::nNextId = 0;
 
-//关键帧的构造函数
+// 关键帧的构造函数
 KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
-    mnFrameId(F.mnId),  mTimeStamp(F.mTimeStamp), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
+    mnFrameId(F.mnId),
+    mTimeStamp(F.mTimeStamp),
+    mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
     mfGridElementWidthInv(F.mfGridElementWidthInv), mfGridElementHeightInv(F.mfGridElementHeightInv),
-    mnTrackReferenceForFrame(0), mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0),
-    mnLoopQuery(0), mnLoopWords(0), mnRelocQuery(0), mnRelocWords(0), mnBAGlobalForKF(0),
+    mnTrackReferenceForFrame(0),
+    mnFuseTargetForKF(0),
+    mnBALocalForKF(0),
+    mnBAFixedForKF(0),
+    mnLoopQuery(0),
+    mnLoopWords(0),
+    mLoopScore(0),
+    mnRelocQuery(0),
+    mnRelocWords(0),
+    mRelocScore(0),
+    mnBAGlobalForKF(0),
     fx(F.fx), fy(F.fy), cx(F.cx), cy(F.cy), invfx(F.invfx), invfy(F.invfy),
-    mbf(F.mbf), mb(F.mb), mThDepth(F.mThDepth), N(F.N), mvKeys(F.mvKeys), mvKeysUn(F.mvKeysUn),
-    mvuRight(F.mvuRight), mvDepth(F.mvDepth), mDescriptors(F.mDescriptors.clone()),
-    mBowVec(F.mBowVec), mFeatVec(F.mFeatVec), mnScaleLevels(F.mnScaleLevels), mfScaleFactor(F.mfScaleFactor),
-    mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
-    mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
-    mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
-    mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mbNotErase(false),
-    mbToBeErased(false), mbBad(false), 
-    mHalfBaseline(F.mb/2),      // 计算双目相机长度的一半
+    N(F.N),
+    mvKeys(F.mvKeys),
+    mvKeysUn(F.mvKeysUn),
+    mDescriptors(F.mDescriptors.clone()),
+    mBowVec(F.mBowVec),
+    mFeatVec(F.mFeatVec),
+    mnScaleLevels(F.mnScaleLevels),
+    mfScaleFactor(F.mfScaleFactor),
+    mfLogScaleFactor(F.mfLogScaleFactor),
+    mvScaleFactors(F.mvScaleFactors),
+    mvLevelSigma2(F.mvLevelSigma2),
+    mvInvLevelSigma2(F.mvInvLevelSigma2),
+    mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX), mnMaxY(F.mnMaxY),
+    mK(F.mK),
+    mvpMapPoints(F.mvpMapPoints),
+    mpKeyFrameDB(pKFDB),
+    mpORBvocabulary(F.mpORBvocabulary),
+    mbFirstConnection(true),
+    mpParent(nullptr),
+    mbNotErase(false),
+    mbToBeErased(false),
+    mbBad(false),
     mpMap(pMap)
 {
     // 获取id
@@ -103,13 +118,6 @@ void KeyFrame::SetPose(const cv::Mat &Tcw_)
     Twc = cv::Mat::eye(4,4,Tcw.type());
     Rwc.copyTo(Twc.rowRange(0,3).colRange(0,3));
     Ow.copyTo(Twc.rowRange(0,3).col(3));
-
-    // center为相机坐标系（左目）下，立体相机中心的坐标
-    // 立体相机中心点坐标与左目相机坐标之间只是在x轴上相差mHalfBaseline,
-    // 因此可以看出，立体相机中两个摄像头的连线为x轴，正方向为左目相机指向右目相机 (齐次坐标)
-    cv::Mat center = (cv::Mat_<float>(4,1) << mHalfBaseline, 0 , 0, 1);
-    // 世界坐标系下，左目相机中心到立体相机中心的向量，方向由左目相机指向立体相机中心
-    Cw = Twc*center;
 }
 
 // 获取位姿
@@ -131,13 +139,6 @@ cv::Mat KeyFrame::GetCameraCenter()
 {
     unique_lock<mutex> lock(mMutexPose);
     return Ow.clone();
-}
-
-// 获取双目相机的中心,这个只有在可视化的时候才会用到
-cv::Mat KeyFrame::GetStereoCenter()
-{
-    unique_lock<mutex> lock(mMutexPose);
-    return Cw.clone();
 }
 
 // 获取姿态
@@ -169,10 +170,10 @@ void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
         // 新建或更新连接权重
         if(!mConnectedKeyFrameWeights.count(pKF)) 
             // count函数返回0，说明mConnectedKeyFrameWeights中没有pKF，新建连接
-            mConnectedKeyFrameWeights[pKF]=weight;
-        else if(mConnectedKeyFrameWeights[pKF]!=weight) 
+            mConnectedKeyFrameWeights[pKF] = weight;
+        else if(mConnectedKeyFrameWeights[pKF] != weight)
             // 之前连接的权重不一样了，需要更新
-            mConnectedKeyFrameWeights[pKF]=weight;
+            mConnectedKeyFrameWeights[pKF] = weight;
         else
             return;
     }
@@ -184,14 +185,13 @@ void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
 /**
  * @brief 按照权重从大到小对连接（共视）的关键帧进行排序
  * 
- * 更新后的变量存储在mvpOrderedConnectedKeyFrames和mvOrderedWeights中
+ * 更新后的变量存储在 mvpOrderedConnectedKeyFrames 和 mvOrderedWeights 中
  */
 void KeyFrame::UpdateBestCovisibles()
 {
     // 互斥锁，防止同时操作共享数据产生冲突
     unique_lock<mutex> lock(mMutexConnections);
-    // http://stackoverflow.com/questions/3389648/difference-between-stdliststdpair-and-stdmap-in-c-stl (std::map 和 std::list<std::pair>的区别)
-    
+
     vector<pair<int,KeyFrame*> > vPairs;
     vPairs.reserve(mConnectedKeyFrameWeights.size());
     // 取出所有连接的关键帧，mConnectedKeyFrameWeights的类型为std::map<KeyFrame*,int>，而vPairs变量将共视的地图点数放在前面，利于排序
@@ -213,7 +213,7 @@ void KeyFrame::UpdateBestCovisibles()
 
     // 权重从大到小排列的连接关键帧
     mvpOrderedConnectedKeyFrames = vector<KeyFrame*>(lKFs.begin(),lKFs.end());
-    // 从大到小排列的权重，和mvpOrderedConnectedKeyFrames一一对应
+    // 从大到小排列的权重，和 mvpOrderedConnectedKeyFrames 一一对应
     mvOrderedWeights = vector<int>(lWs.begin(), lWs.end());
 }
 
@@ -246,12 +246,12 @@ vector<KeyFrame*> KeyFrame::GetBestCovisibilityKeyFrames(const int &N)
 {
     unique_lock<mutex> lock(mMutexConnections);
 
-    if((int)mvpOrderedConnectedKeyFrames.size()<N)
+    if((int)mvpOrderedConnectedKeyFrames.size() < N)
         // 如果总数不够，就返回所有的关键帧
         return mvpOrderedConnectedKeyFrames;
     else
         // 取前N个最强共视关键帧
-        return vector<KeyFrame*>(mvpOrderedConnectedKeyFrames.begin(),mvpOrderedConnectedKeyFrames.begin()+N);
+        return std::vector<KeyFrame*>(mvpOrderedConnectedKeyFrames.begin(), mvpOrderedConnectedKeyFrames.begin() + N);
 }
 
 
@@ -271,19 +271,19 @@ vector<KeyFrame*> KeyFrame::GetCovisiblesByWeight(const int &w)
 
     // http://www.cplusplus.com/reference/algorithm/upper_bound/
     // 从mvOrderedWeights找出第一个大于w的那个迭代器
-    auto it = upper_bound( mvOrderedWeights.begin(),   //起点
-                                            mvOrderedWeights.end(),     //终点
-                                            w,                          //目标阈值
-                                            KeyFrame::weightComp);      //比较函数从大到小排序
+    auto it = std::upper_bound(mvOrderedWeights.begin(),   //起点
+                               mvOrderedWeights.end(),     //终点
+                               w,                          //目标阈值
+                               KeyFrame::weightComp);      //比较函数从大到小排序
     
     // 如果没有找到，说明最大的权重也比给定的阈值小，返回空
-    if(it==mvOrderedWeights.end() && *mvOrderedWeights.rbegin()<w)
+    if(it==mvOrderedWeights.end() && *mvOrderedWeights.rbegin() < w)
         return {};
     else
     {
         // 如果存在，返回满足要求的关键帧
-        int n = it-mvOrderedWeights.begin();
-        return vector<KeyFrame*>(mvpOrderedConnectedKeyFrames.begin(), mvpOrderedConnectedKeyFrames.begin()+n);
+        int n = it - mvOrderedWeights.begin();
+        return vector<KeyFrame*>(mvpOrderedConnectedKeyFrames.begin(), mvpOrderedConnectedKeyFrames.begin() + n);
     }
 }
 
@@ -303,7 +303,7 @@ int KeyFrame::GetWeight(KeyFrame *pKF)
 void KeyFrame::AddMapPoint(MapPoint *pMP, const size_t &idx)
 {
     unique_lock<mutex> lock(mMutexFeatures);
-    mvpMapPoints[idx]=pMP;
+    mvpMapPoints[idx] = pMP;
 }
 
 
@@ -316,7 +316,7 @@ void KeyFrame::EraseMapPointMatch(const size_t &idx)
 {
     unique_lock<mutex> lock(mMutexFeatures);
     // NOTE 使用这种方式表示其中的某个地图点被删除
-    mvpMapPoints[idx]=static_cast<MapPoint*>(NULL);
+    mvpMapPoints[idx] = nullptr;
 }
 
 // 同上
@@ -325,13 +325,13 @@ void KeyFrame::EraseMapPointMatch(MapPoint* pMP)
     //获取当前地图点在某个关键帧的观测中，对应的特征点的索引，如果没有观测，索引为-1
     int idx = pMP->GetIndexInKeyFrame(this);
     if(idx>=0)
-        mvpMapPoints[idx]=static_cast<MapPoint*>(NULL);
+        mvpMapPoints[idx] = nullptr;
 }
 
 // 地图点的替换
 void KeyFrame::ReplaceMapPointMatch(const size_t &idx, MapPoint* pMP)
 {
-    mvpMapPoints[idx]=pMP;
+    mvpMapPoints[idx] = pMP;
 }
 
 // 获取当前关键帧中的所有地图点
@@ -340,12 +340,11 @@ set<MapPoint*> KeyFrame::GetMapPoints()
     unique_lock<mutex> lock(mMutexFeatures);
 
     set<MapPoint*> s;
-    for(auto & mvpMapPoint : mvpMapPoints)
+    for(MapPoint* pMP : mvpMapPoints)
     {
         // 判断是否被删除了
-        if(!mvpMapPoint)
+        if(pMP == nullptr)
             continue;
-        MapPoint* pMP = mvpMapPoint;
         // 如果是没有来得及删除的坏点也要进行这一步
         if(!pMP->isBad())
             s.insert(pMP);
@@ -360,24 +359,21 @@ int KeyFrame::TrackedMapPoints(const int &minObs)
 
     int nPoints=0;
     // 是否检查数目
-    const bool bCheckObs = minObs>0;
+    const bool bCheckObs = minObs > 0;
     // N是当前帧中特征点的个数
     for(int i=0; i<N; i++)
     {
         MapPoint* pMP = mvpMapPoints[i];
-        if(pMP)     //没有被删除
+        if(pMP && !pMP->isBad())   //没有被删除并且不是坏点
         {
-            if(!pMP->isBad())   //并且不是坏点
+            if(bCheckObs)
             {
-                if(bCheckObs)
-                {
-                    // 满足输入阈值要求的地图点计数加1
-                    if(mvpMapPoints[i]->Observations()>=minObs)
-                        nPoints++;
-                }
-                else
-                    nPoints++; //!bug
+                // 满足输入阈值要求的地图点计数加1
+                if(mvpMapPoints[i]->Observations()>=minObs)
+                    nPoints++;
             }
+            else
+                nPoints++; //!bug
         }
     }
 
@@ -457,7 +453,7 @@ void KeyFrame::UpdateConnections()
     // If the counter is greater than threshold add connection
     // In case no keyframe counter is over threshold add the one with maximum counter
     int nmax=0; // 记录最高的共视程度
-    KeyFrame* pKFmax=NULL;
+    KeyFrame* pKFmax=nullptr;
     // 至少有15个共视地图点才会添加共视关系
     int th = 15;
 
@@ -789,20 +785,20 @@ vector<size_t> KeyFrame::GetFeaturesInArea(const float &x, const float &y, const
     // 计算要搜索的cell的范围
 
     // floor向下取整，mfGridElementWidthInv 为每个像素占多少个格子
-    const int nMinCellX = max(0,(int)floor((x-mnMinX-r)*mfGridElementWidthInv));
+    const int nMinCellX = max(0, (int)floor((x-mnMinX-r) * mfGridElementWidthInv));
     if(nMinCellX>=mnGridCols)
         return vIndices;
 
     // ceil向上取整
-    const int nMaxCellX = min((int)mnGridCols-1,(int)ceil((x-mnMinX+r)*mfGridElementWidthInv));
+    const int nMaxCellX = min((int)mnGridCols-1, (int)ceil((x-mnMinX+r) * mfGridElementWidthInv));
     if(nMaxCellX<0)
         return vIndices;
 
-    const int nMinCellY = max(0,(int)floor((y-mnMinY-r)*mfGridElementHeightInv));
+    const int nMinCellY = max(0, (int)floor((y-mnMinY-r) * mfGridElementHeightInv));
     if(nMinCellY>=mnGridRows)
         return vIndices;
 
-    const int nMaxCellY = min((int)mnGridRows-1,(int)ceil((y-mnMinY+r)*mfGridElementHeightInv));
+    const int nMaxCellY = min((int)mnGridRows-1, (int)ceil((y-mnMinY+r) * mfGridElementHeightInv));
     if(nMaxCellY<0)
         return vIndices;
 
@@ -833,34 +829,34 @@ bool KeyFrame::IsInImage(const float &x, const float &y) const
     return (x>=mnMinX && x<mnMaxX && y>=mnMinY && y<mnMaxY);
 }
 
-/**
- * @brief 在双目和RGBD情况下将特征点反投影到空间中得到世界坐标系下三维点
- * 
- * @param[in] i                 第i个特征点
- * @return cv::Mat              返回世界坐标系下三维点
- */
-cv::Mat KeyFrame::UnprojectStereo(int i)
-{
-    const float z = mvDepth[i];
-    if(z>0)
-    {
-        // 由2维图像反投影到相机坐标系
-        // 双目中mvDepth是在ComputeStereoMatches函数中求取的，rgbd中是直接测量的
-        const float u = mvKeys[i].pt.x;
-        const float v = mvKeys[i].pt.y;
-        const float x = (u-cx)*z*invfx;
-        const float y = (v-cy)*z*invfy;
-        cv::Mat x3Dc = (cv::Mat_<float>(3,1) << x, y, z);
-
-        unique_lock<mutex> lock(mMutexPose);
-        // 由相机坐标系转换到世界坐标系
-        // Twc为相机坐标系到世界坐标系的变换矩阵
-        // Twc.rosRange(0,3).colRange(0,3)取Twc矩阵的前3行与前3列
-        return Twc.rowRange(0,3).colRange(0,3)*x3Dc+Twc.rowRange(0,3).col(3);
-    }
-    else
-        return {};
-}
+///**
+// * @brief 在双目和RGBD情况下将特征点反投影到空间中得到世界坐标系下三维点
+// *
+// * @param[in] i                 第i个特征点
+// * @return cv::Mat              返回世界坐标系下三维点
+// */
+//cv::Mat KeyFrame::UnprojectStereo(int i)
+//{
+//    const float z = mvDepth[i];
+//    if(z>0)
+//    {
+//        // 由2维图像反投影到相机坐标系
+//        // 双目中mvDepth是在ComputeStereoMatches函数中求取的，rgbd中是直接测量的
+//        const float u = mvKeys[i].pt.x;
+//        const float v = mvKeys[i].pt.y;
+//        const float x = (u-cx)*z*invfx;
+//        const float y = (v-cy)*z*invfy;
+//        cv::Mat x3Dc = (cv::Mat_<float>(3,1) << x, y, z);
+//
+//        unique_lock<mutex> lock(mMutexPose);
+//        // 由相机坐标系转换到世界坐标系
+//        // Twc为相机坐标系到世界坐标系的变换矩阵
+//        // Twc.rosRange(0,3).colRange(0,3)取Twc矩阵的前3行与前3列
+//        return Twc.rowRange(0,3).colRange(0,3)*x3Dc+Twc.rowRange(0,3).col(3);
+//    }
+//    else
+//        return {};
+//}
 
 // Compute Scene Depth (q=2 median). Used in monocular. 评估当前关键帧场景深度，q=2表示中值. 只是在单目情况下才会使用
 // 其实过程就是对当前关键帧下所有地图点的深度进行从小到大排序,返回距离头部其中1/q处的深度值作为当前场景的平均深度
@@ -869,8 +865,9 @@ float KeyFrame::ComputeSceneMedianDepth(const int q)
     vector<MapPoint*> vpMapPoints;
     cv::Mat Tcw_;
     {
-        unique_lock<mutex> lock(mMutexFeatures);
-        unique_lock<mutex> lock2(mMutexPose);
+        unique_lock<mutex> lock(mMutexFeatures, std::defer_lock);
+        unique_lock<mutex> lock2(mMutexPose, std::defer_lock);
+        std::lock(lock, lock2);
         vpMapPoints = mvpMapPoints;
         Tcw_ = Tcw.clone();
     }
@@ -894,7 +891,7 @@ float KeyFrame::ComputeSceneMedianDepth(const int q)
 
     sort(vDepths.begin(),vDepths.end());
 
-    return vDepths[(vDepths.size()-1)/q];
+    return vDepths[(vDepths.size()-1) / q];
 }
 
 } //namespace ORB_SLAM
