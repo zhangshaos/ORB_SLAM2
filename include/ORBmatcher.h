@@ -23,17 +23,18 @@
 #define ORBMATCHER_H
 
 #include <vector>
+#include <set>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/features2d/features2d.hpp>
 
-#include "MapPoint.h"
-#include "KeyFrame.h"
-#include "Frame.h"
-
 
 namespace ORB_SLAM2
 {
+
+class MapPoint;
+class KeyFrame;
+class Frame;
 
 class ORBmatcher
 {    
@@ -113,7 +114,7 @@ public:
      * @param[in] pKF               要投影到的关键帧
      * @param[in] Scw               相似变换
      * @param[in] vpPoints          空间点
-     * @param[in] vpMatched         已经得到的空间点和关键帧上点的匹配关系
+     * @param[in & out] vpMatched   已经得到的空间点和关键帧上点的匹配关系
      * @param[in] th                搜索窗口的阈值
      * @return int                  匹配的特征点数目
      */
@@ -156,7 +157,7 @@ public:
      * @param[in] windowSize                搜索窗口
      * @return int                          返回成功匹配的特征点数目
      */
-    int SearchForInitialization(Frame &F1, Frame &F2, std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize=10);
+    int SearchForInitialization(const Frame &F1, const Frame &F2, std::vector<cv::Point2f> &vbPrevMatched, std::vector<int> &vnMatches12, int windowSize=10);
 
     // Matching to triangulate new MapPoints. Check Epipolar Constraint.
     /**
@@ -169,7 +170,7 @@ public:
      * @return              成功匹配的数量
      */
     int SearchForTriangulation(KeyFrame *pKF1, KeyFrame* pKF2, cv::Mat F12,
-                               std::vector<pair<size_t, size_t> > &vMatchedPairs, const bool bOnlyStereo);
+                               std::vector<std::pair<size_t, size_t> > &vMatchedPairs, const bool bOnlyStereo);
 
     // Search matches between MapPoints seen in KF1 and KF2 transforming by a Sim3 [s12*R12|t12]
     // NOTE In the stereo and RGB-D case, s12=1
@@ -195,7 +196,7 @@ public:
      * @param[in] th            搜索窗口的阈值
      * @return int 
      */
-    int Fuse(KeyFrame* pKF, const vector<MapPoint *> &vpMapPoints, const float th=3.0);
+    int Fuse(KeyFrame* pKF, const std::vector<MapPoint *> &vpMapPoints, const float th=3.0);
 
     // Project MapPoints into KeyFrame using a given Sim3 and search for duplicated MapPoints.
     /**
@@ -208,7 +209,7 @@ public:
      * @param[out] vpReplacePoint   需要替换掉的地图点,键值对
      * @return int                  融合的地图点个数
      */
-    int Fuse(KeyFrame* pKF, cv::Mat Scw, const std::vector<MapPoint*> &vpPoints, float th, vector<MapPoint *> &vpReplacePoint);
+    int Fuse(KeyFrame* pKF, cv::Mat Scw, const std::vector<MapPoint*> &vpPoints, float th, std::vector<MapPoint *> &vpReplacePoint);
 
 public:
 

@@ -23,9 +23,7 @@
 
 #include <set>
 #include <mutex>
-
-#include "MapPoint.h"
-#include "KeyFrame.h"
+#include <vector>
 
 
 namespace ORB_SLAM2
@@ -132,7 +130,7 @@ public:
     void clear();
 
     // 保存了最初始的关键帧
-    vector<KeyFrame*> mvpKeyFrameOrigins;
+    std::vector<KeyFrame*> mvpKeyFrameOrigins;
 
     ///当更新地图时的互斥量.回环检测中和局部BA后更新全局地图的时候会用到这个
     std::mutex mMutexMapUpdate;
@@ -148,7 +146,7 @@ protected:
     // 存储所有的关键帧
     std::set<KeyFrame*> mspKeyFrames; 
 
-    ///参考地图点
+    // 参考地图点
     std::vector<MapPoint*> mvpReferenceMapPoints;
 
     ///当前地图中具有最大ID的关键帧

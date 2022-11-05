@@ -71,19 +71,18 @@ cv::Mat Converter::toCvMat(const g2o::SE3Quat &SE3)
 //将仿射矩阵由g2o::Sim3->cv::Mat
 cv::Mat Converter::toCvMat(const g2o::Sim3 &Sim3)
 {
-	///首先将仿射矩阵的旋转部分转换成为Eigen下的矩阵格式
+	  // 首先将仿射矩阵的旋转部分转换成为Eigen下的矩阵格式
     Eigen::Matrix3d eigR = Sim3.rotation().toRotationMatrix();
-	///对于仿射矩阵的平移部分也是要转换成为Eigen下的矩阵格式
+    // 对于仿射矩阵的平移部分也是要转换成为Eigen下的矩阵格式
     Eigen::Vector3d eigt = Sim3.translation();
-	///获取仿射矩阵的缩放系数
+    // 获取仿射矩阵的缩放系数
     double s = Sim3.scale();
-	///然后构造cv::Mat格式下的仿射矩阵
-	///@todo 感觉这里的sim3就是在se3的基础上多了一个缩放系数，但是实际上真的是这样吗？
+    // 然后构造cv::Mat格式下的仿射矩阵
     return toCvSE3(s*eigR,eigt);
 }
 
 //Eigen::Matrix<double,4,4> -> cv::Mat，用于变换矩阵T的中间转换
-cv::Mat Converter::toCvMat(const Eigen::Matrix<double,4,4> &m)
+cv::Mat Converter::toCvMat(const Eigen::Matrix4d &m)
 {
 	//首先定义存储计算结果的变量
     cv::Mat cvMat(4,4,CV_32F);
@@ -199,6 +198,28 @@ std::vector<float> Converter::toQuaternion(const cv::Mat &M)
     v[3] = q.w();
 	//返回转换结果
     return v;
+}
+
+Eigen::Matrix<double, 3, 4> Converter::toMatrix34d(const cv::Mat &cvMat4)
+{
+  Eigen::Matrix<double,3,4> M;
+  M << cvMat4.at<float>(0,0), cvMat4.at<float>(0,1), cvMat4.at<float>(0,2), cvMat4.at<float>(0,3),
+    cvMat4.at<float>(1,0), cvMat4.at<float>(1,1), cvMat4.at<float>(1,2), cvMat4.at<float>(1,3),
+    cvMat4.at<float>(2,0), cvMat4.at<float>(2,1), cvMat4.at<float>(2,2), cvMat4.at<float>(2,3);
+  return M;
+}
+
+Eigen::Matrix<double, 4, 4> Converter::toMatrix4d(const cv::Mat &cvMat4) {
+  Eigen::Matrix<double,4,4> M;
+  M << cvMat4.at<float>(0,0), cvMat4.at<float>(0,1), cvMat4.at<float>(0,2), cvMat4.at<float>(0,3),
+    cvMat4.at<float>(1,0), cvMat4.at<float>(1,1), cvMat4.at<float>(1,2), cvMat4.at<float>(1,3),
+    cvMat4.at<float>(2,0), cvMat4.at<float>(2,1), cvMat4.at<float>(2,2), cvMat4.at<float>(2,3),
+    cvMat4.at<float>(3,0), cvMat4.at<float>(3,1), cvMat4.at<float>(3,2), cvMat4.at<float>(3,3);
+  return M;
+}
+
+cv::Mat Converter::toCvMat(const Sophus::SE3d &se3d) {
+  return Converter::toCvMat(se3d.matrix());
 }
 
 } //namespace ORB_SLAM

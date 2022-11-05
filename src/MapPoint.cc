@@ -20,6 +20,11 @@
 
 #include <mutex>
 
+#include <opencv2/core.hpp>
+
+#include "Frame.h"
+#include "KeyFrame.h"
+#include "Map.h"
 #include "MapPoint.h"
 #include "ORBmatcher.h"
 
@@ -27,8 +32,10 @@
 namespace ORB_SLAM2
 {
 
+using namespace std;
+
 long unsigned int MapPoint::nNextId=0;
-mutex MapPoint::mGlobalMutex;
+std::mutex MapPoint::mGlobalMutex;
 
 /**
  * @brief Construct a new Map Point:: Map Point object
@@ -45,7 +52,7 @@ MapPoint::MapPoint(const cv::Mat &Pos,  //地图点的世界坐标
     nObs(0),                                //被观测次数
     mnTrackReferenceForFrame(0),            //放置被重复添加到局部地图点的标记
     mnLastFrameSeen(0),                     //是否决定判断在某个帧视野中的变量
-    mnBALocalForKF(0),                      //
+    mnLocalBAForKF(0),                      //
     mnFuseCandidateForKF(0),                //
     mnLoopPointForKF(0),                    //
     mnCorrectedByKF(0),                     //
@@ -59,11 +66,11 @@ MapPoint::MapPoint(const cv::Mat &Pos,  //地图点的世界坐标
     mfMinDistance(0),                       //当前地图点在某帧下,可信赖的被找到时其到关键帧光心距离的下界
     mfMaxDistance(0),                       //上界
     mpMap(pMap),                            //从属地图
-    mTrackProjX(0.f),
-    mTrackProjY(0.f),
-    mnTrackScaleLevel(0),
-    mTrackViewCos(0.f),
-    mbTrackInView(false)
+    mTrackedProjX(0.f),
+    mTrackedProjY(0.f),
+    mnTrackedScaleLevel(0),
+    mTrackedViewCosine(0.f),
+    mbNeedTrackInView(false)
 {
     Pos.copyTo(mWorldPos);
     //平均观测方向初始化为0
@@ -84,28 +91,28 @@ MapPoint::MapPoint(const cv::Mat &Pos,  //地图点的世界坐标
  * @param idxF   MapPoint在Frame中的索引，即对应的特征点的编号
  */
 MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF):
-    mnFirstKFid(-1),
-    mnFirstFrame(pFrame->mnId),
-    nObs(0),
-    mnTrackReferenceForFrame(0),
-    mnLastFrameSeen(0),
-    mnBALocalForKF(0),
-    mnFuseCandidateForKF(0),
-    mnLoopPointForKF(0),
-    mnCorrectedByKF(0),
-    mnCorrectedReference(0),
-    mnBAGlobalForKF(0),
-    mpRefKF(nullptr),
-    mnVisible(1),
-    mnFound(1),
-    mbBad(false),
-    mpReplaced(nullptr),
-    mpMap(pMap),
-    mTrackProjX(0.f),
-    mTrackProjY(0.f),
-    mnTrackScaleLevel(0),
-    mTrackViewCos(0.f),
-    mbTrackInView(false)
+  mnFirstKFid(-1),
+  mnFirstFrame(pFrame->mnId),
+  nObs(0),
+  mnTrackReferenceForFrame(0),
+  mnLastFrameSeen(0),
+  mnLocalBAForKF(0),
+  mnFuseCandidateForKF(0),
+  mnLoopPointForKF(0),
+  mnCorrectedByKF(0),
+  mnCorrectedReference(0),
+  mnBAGlobalForKF(0),
+  mpRefKF(nullptr),
+  mnVisible(1),
+  mnFound(1),
+  mbBad(false),
+  mpReplaced(nullptr),
+  mpMap(pMap),
+  mTrackedProjX(0.f),
+  mTrackedProjY(0.f),
+  mnTrackedScaleLevel(0),
+  mTrackedViewCosine(0.f),
+  mbNeedTrackInView(false)
 {
     Pos.copyTo(mWorldPos);
     cv::Mat Ow = pFrame->GetCameraCenter();
@@ -472,7 +479,7 @@ cv::Mat MapPoint::GetDescriptor()
     return mDescriptor.clone();
 }
 
-//获取当前地图点在某个关键帧的观测中，对应的特征点的ID
+// 获取当前地图点在某个关键帧的观测中，对应的特征点的ID
 int MapPoint::GetIndexInKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexFeatures);

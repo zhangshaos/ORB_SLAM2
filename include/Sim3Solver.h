@@ -26,12 +26,11 @@
 
 #include <opencv2/opencv.hpp>
 
-#include "KeyFrame.h"
-
-
 
 namespace ORB_SLAM2
 {
+
+class KeyFrame;
 
 /** @brief Sim3 求解器 */
 class Sim3Solver
@@ -68,9 +67,9 @@ public:
      * @brief Ransac求解mvX3Dc1和mvX3Dc2之间Sim3，函数返回mvX3Dc2到mvX3Dc1的Sim3变换
      * 
      * @param[in] nIterations           设置的最大迭代次数
-     * @param[in] bNoMore               为true表示穷尽迭代还没有找到好的结果，说明求解失败
-     * @param[in] vbInliers             标记是否是内点
-     * @param[in] nInliers              内点数目
+     * @param[out] bNoMore              为true表示穷尽迭代还没有找到好的结果，说明求解失败
+     * @param[out] vbInliers            标记是否是内点
+     * @param[out] nInliers             内点数目
      * @return cv::Mat                  计算得到的Sim3矩阵
      */
     cv::Mat iterate(int nIterations, bool &bNoMore, std::vector<bool> &vbInliers, int &nInliers);

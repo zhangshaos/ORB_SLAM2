@@ -24,6 +24,7 @@
 
 #include <opencv2/core/core.hpp>
 #include <Eigen/Dense>
+#include <Sophus/se3.hpp>
 #include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
 #include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 
@@ -96,6 +97,16 @@ public:
      * @remark
      */
     static cv::Mat toCvMat(const g2o::Sim3 &Sim3);
+
+    /**
+     * @brief SE3转换成为cv::Mat格式(4x4矩阵)
+     *
+     * @paramp[in] se3d double SE3
+     * @return cv::Mat 转换结果
+     * @remark
+     */
+    static cv::Mat toCvMat(const Sophus::SE3d &se3d);
+
     /**
      * @brief 将4x4 double型Eigen矩阵存储的位姿转换成为cv::Mat格式
      * 
@@ -103,7 +114,7 @@ public:
      * @return cv::Mat 转换结果
      * @remark
      */
-    static cv::Mat toCvMat(const Eigen::Matrix<double,4,4> &m);
+    static cv::Mat toCvMat(const Eigen::Matrix4d &m);
     /**
      * @brief 将一个3x1的Eigen行向量转换成为cv::Mat格式
      * 
@@ -157,6 +168,23 @@ public:
      * @return Eigen::Matrix<double,3,3> 转换结果
      */
     static Eigen::Matrix<double,3,3> toMatrix3d(const cv::Mat &cvMat3);
+
+    /**
+     * @brief 将一个4x4的cv::Mat矩阵转换成为Eigen中的矩阵
+     *
+     * @param[in] cvMat4 输入
+     * @return Eigen::Matrix<double,3,4>
+     */
+    static Eigen::Matrix<double, 3, 4> toMatrix34d(const cv::Mat &cvMat4);
+
+    /**
+     * @brief 将一个4x4的cv::Mat矩阵转换成为Eigen中的矩阵
+     *
+     * @param[in] cvMat4 输入
+     * @return Eigen::Matrix<double,4,4>
+     */
+    static Eigen::Matrix<double, 4, 4> toMatrix4d(const cv::Mat &cvMat4);
+
     /**
      * @brief 将给定的cv::Mat类型的旋转矩阵转换成以std::vector<float>类型表示的四元数
      * 

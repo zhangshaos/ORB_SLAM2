@@ -23,28 +23,17 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-//一些公用库的支持，字符串操作，多线程操作，以及opencv库等
 #include <string>
 #include <thread>
 #include <optional>
 #include <opencv2/core/core.hpp>
 #include <sophus/geometry.hpp>
 
-//下面则是本ORB-SLAM2系统中的其他模块
-#include "Tracking.h"
-#include "FrameDrawer.h"
-#include "MapDrawer.h"
-#include "Map.h"
-#include "LocalMapping.h"
-#include "LoopClosing.h"
-#include "KeyFrameDatabase.h"
-#include "ORBVocabulary.h"
-#include "Viewer.h"
 
 namespace ORB_SLAM2
 {
 
-//要用到的其他类的前视声明
+// 要用到的其他类的前视声明
 class Viewer;
 class FrameDrawer;
 class Map;
@@ -56,86 +45,49 @@ class LoopClosing;
 class System
 {
 public:
-    // Input sensor
-    //这个枚举类型用于 表示本系统所使用的传感器类型
-    enum eSensor {
-        MONOCULAR=0,
-        STEREO=1,
-        RGBD=2
-    };
-
-public:
-
-    // Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
-    //构造函数，用来初始化整个系统。
     System(const string &strVocFile,            //指定ORB字典文件的路径
            const string &strSettingsFile,       //指定配置文件的路径
-           const eSensor sensor,                //指定所使用的传感器类型
            const bool bUseViewer = true);       //指定是否使用可视化界面
 
-    //下面是针对三种不同类型的传感器所设计的三种运动追踪接口。彩色图像为CV_8UC3类型，并且都将会被转换成为灰度图像。
-    //追踪接口返回估计的相机位姿，如果追踪失败则返回NULL
+    /**
+     * 给定输入
+     *
+     * @param[in] im RGB|RGBA|Gray 图片
+     * @param[in] timestamp 时间戳
+     * @param[in] poseTcw 当前相机位姿（坐标系为相机坐标系：前z，右x，下y）
+     * @return Tracking::State
+     */
+    int TrackMonocularWithPose(const cv::Mat &im, double timestamp,
+                                           const Sophus::SE3d& poseTcw);
 
-    // Proccess the given monocular frame
-    // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
-    // Returns the camera pose (empty if tracking fails).
-    cv::Mat TrackMonocular(const cv::Mat &im,           //图像
-                           const double &timestamp);    //时间戳
-
-    std::optional<Sophus::SE3d> TrackMonocularWithPose(const cv::Mat &im,
-                                                       double timestamp,
-                                                       const Sophus::SE3d& pose);
-
-    // Returns true if there have been a big map change (loop closure, global BA)
-    // since last call to this function
     // 获取从上次调用本函数后是否发生了比较大的地图变化
     bool MapChanged();
 
-    // Reset the system (clear map)
     // 复位 系统
     void Reset();
 
     // All threads will be requested to finish.
     // It waits until all threads have finished.
     // This function must be called before saving the trajectory.
-    //关闭系统，这将会关闭所有线程并且丢失曾经的各种数据
+    // 关闭系统，这将会关闭所有线程并且丢失曾经的各种数据
     void Shutdown();
 
-    // Save camera trajectory in the TUM RGB-D dataset format.
-    // NOTE Only for stereo and RGB-D. This method does not work for monocular.
-    // Call first Shutdown()
-    // See format details at: http://vision.in.tum.de/data/datasets/rgbd-dataset
-    // 以TUM格式保存相机的运动轨迹，这个函数将会在Shutdown函数中被首先调用
-    void SaveTrajectoryTUM(const string &filename);         //指定文件名
-
-    // Save keyframe poses in the TUM RGB-D dataset format.
-    // NOTE This method works for all sensor input.
-    // Call first Shutdown()
-    // See format details at: http://vision.in.tum.de/data/datasets/rgbd-dataset
-    // 以TUM格式保存关键帧位姿。
-    void SaveKeyFrameTrajectoryTUM(const string &filename);     //指定文件名
-
-    // Save camera trajectory in the KITTI dataset format.
-    // NOTE Only for stereo and RGB-D. This method does not work for monocular.
-    // Call first Shutdown()
-    // See format details at: http://www.cvlibs.net/datasets/kitti/eval_odometry.php
-    // 以KITTI格式保存相机的运行轨迹
-    void SaveTrajectoryKITTI(const string &filename);
-
-    // 在这里可以实现自己的地图保存和加载函数
+    // 保存整个地图
     bool SaveMap(const string &filename);
     bool LoadMap(const string &filename);
 
     // Information from most recent processed frame
     // You can call this right after TrackMonocular (or stereo or RGBD)
-    //获取最近的运动追踪状态、地图点追踪状态、特征点追踪状态（）
+    // 获取最近的运动追踪状态、地图点追踪状态、特征点追踪状态
     int GetTrackingState();
     std::vector<MapPoint*> GetTrackedMapPoints();
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
+    // 保存最近成功追踪到的地图点
+    bool SaveTrackedMap(const std::string &filePath);
 
-private:
-    //注意变量命名方式，类的变量有前缀m，如果这个变量是指针类型还要多加个前缀p，
-    //如果是线程那么加个前缀t
+protected:
+    // 注意变量命名方式，类的变量有前缀m，如果这个变量是指针类型还要多加个前缀p，
+    // 如果是线程那么加个前缀t
 
     // ORB vocabulary used for place recognition and feature matching.
     // 一个指针指向ORB字典
@@ -192,6 +144,11 @@ private:
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
+
+    // 存储当前系统输入位姿
+    Sophus::SE3d mInPoseTcw;
+    // 存储当前系统输入图片
+    cv::Mat mInImage;
 };
 
 }// namespace ORB_SLAM

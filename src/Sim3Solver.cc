@@ -25,8 +25,8 @@
 #include <opencv2/core/core.hpp>
 #include "Thirdparty/DBoW2/DUtils/Random.h"
 
+#include "MapPoint.h"
 #include "KeyFrame.h"
-#include "ORBmatcher.h"
 #include "Sim3Solver.h"
 
 
@@ -192,9 +192,9 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
  * @brief Ransac求解mvX3Dc1和mvX3Dc2之间Sim3，函数返回mvX3Dc2到mvX3Dc1的Sim3变换
  * 
  * @param[in] nIterations           设置的最大迭代次数
- * @param[in] bNoMore               为true表示穷尽迭代还没有找到好的结果，说明求解失败
- * @param[in] vbInliers             标记是否是内点
- * @param[in] nInliers              内点数目
+ * @param[out] bNoMore               为true表示穷尽迭代还没有找到好的结果，说明求解失败
+ * @param[out] vbInliers             标记是否是内点
+ * @param[out] nInliers              内点数目
  * @return cv::Mat                  计算得到的Sim3矩阵
  */
 cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInliers, int &nInliers)

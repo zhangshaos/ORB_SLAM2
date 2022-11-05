@@ -29,10 +29,7 @@
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 
-#include "MapPoint.h"
 #include "ORBVocabulary.h"
-#include "KeyFrame.h"
-#include "ORBextractor.h"
 
 
 namespace ORB_SLAM2
@@ -58,6 +55,7 @@ namespace ORB_SLAM2
 
 class MapPoint;
 class KeyFrame;
+class ORBextractor;
 
 /**
  * @brief 帧
@@ -96,7 +94,7 @@ public:
     /**
      * @brief 计算词袋模型, 存放在mBowVec中
      * @details 计算词包 mBowVec 和 mFeatVec ，其中 mFeatVec 记录了属于第i个node（在第4层）的ni个描述子
-     * @see CreateInitialMapMonocular() TrackReferenceKeyFrame() Relocalization()
+     * @see CreateInitialMap() TrackReferenceKeyFrame() Relocalization()
      */
     void ComputeBoW();
 
@@ -106,6 +104,11 @@ public:
      * @param[in] Tcw 从世界坐标系到当前帧相机位姿的变换矩阵
      */
     void SetPose(cv::Mat Tcw);
+
+    const cv::Mat& getPose() const
+    {
+      return mTcw;
+    }
 
     /**
      * @brief 根据相机位姿,计算相机的旋转,平移和相机中心等矩阵.
@@ -174,6 +177,16 @@ public:
      */
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r, const int minLevel=-1, const int maxLevel=-1) const;
 
+    const std::vector<cv::KeyPoint>& getKeyPoints() const
+    {
+      return mvKeysUn;
+    }
+
+    const cv::Mat& getCameraIntrincs() const
+    {
+      return mK;
+    }
+
 public:
 
     // Vocabulary used for relocalization.
@@ -230,11 +243,6 @@ public:
     // 每个特征点对应的MapPoint.如果特征点没有对应的地图点,那么将存储一个空指针
     std::vector<MapPoint*> mvpMapPoints;
 
-    // Flag to identify outlier associations.
-    // 观测不到Map中的3D点
-    // 属于外点的特征点标记,在 Optimizer::PoseOptimization 使用了
-    std::vector<bool> mvbOutlier;
-
     // Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
 	  // 原来通过对图像分区域还能够降低重投影地图点时候的匹配复杂度
     // 注意到上面也是类的静态成员变量， 有一个专用的标志 mbInitialComputations 用来在帧的构造函数中标记这些静态成员变量是否需要被赋值
@@ -249,7 +257,6 @@ public:
     // FRAME_GRID_COLS 64
 	  // 这个向量中存储的是每个图像网格内特征点的id（左图）
     std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
-
 
     // Camera pose.
     cv::Mat mTcw; // 相机姿态，世界坐标系到相机坐标坐标系的变换矩阵,是我们常规理解中的相机位姿
@@ -269,7 +276,7 @@ public:
                                   
     vector<float> mvScaleFactors;		    // 图像金字塔每一层的缩放因子
     vector<float> mvInvScaleFactors;	  // 以及上面的这个变量的倒数
-    vector<float> mvLevelSigma2;		    // todo：目前在 frame.cpp 中没有用到
+    vector<float> mvLevelSigma2;		    // 目前在 frame.cpp 中没有用到
     vector<float> mvInvLevelSigma2;		  // 上面变量的倒数
 
     // Undistorted Image Bounds (computed once).

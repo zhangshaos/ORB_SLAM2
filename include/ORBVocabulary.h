@@ -27,6 +27,7 @@
 
 namespace ORB_SLAM2
 {
+
 // 只是增加了一个自定义的数据类型罢了
 typedef DBoW2::TemplatedVocabulary<DBoW2::FORB::TDescriptor, DBoW2::FORB>
   ORBVocabulary;

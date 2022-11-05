@@ -21,49 +21,51 @@
 #ifndef OPTIMIZER_H
 #define OPTIMIZER_H
 
+#include <vector>
+#include <map>
+#include <set>
+
 #include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 
-#include "Map.h"
-#include "MapPoint.h"
-#include "KeyFrame.h"
 #include "LoopClosing.h"
-#include "Frame.h"
-
 
 namespace ORB_SLAM2
 {
 
-class LoopClosing;
+class Map;
+class MapPoint;
+class KeyFrame;
+class Frame;
 
 /** @brief 优化器,所有的优化相关的函数都在这个类中; 并且这个类只有成员函数没有成员变量,相对要好分析一点 */
 class Optimizer
 {
 public:
 
-    /**
-     * @brief bundle adjustment Optimization
-     * 
-     * 3D-2D 最小化重投影误差 e = (u,v) - project(Tcw*Pw) \n
-     * 
-     * 1. Vertex: g2o::VertexSE3Expmap()，即当前帧的Tcw
-     *            g2o::VertexSBAPointXYZ()，MapPoint的mWorldPos
-     * 2. Edge:
-     *     - g2o::EdgeSE3ProjectXYZ()，BaseBinaryEdge
-     *         + Vertex：待优化当前帧的Tcw
-     *         + Vertex：待优化MapPoint的mWorldPos
-     *         + measurement：MapPoint在当前帧中的二维位置(u,v)
-     *         + InfoMatrix: invSigma2(与特征点所在的尺度有关)
-     *         
-     * @param   vpKFs    关键帧 
-     *          vpMP     MapPoints
-     *          nIterations 迭代次数（20次）
-     *          pbStopFlag  是否强制暂停
-     *          nLoopKF  关键帧的个数 -- 但是我觉得形成了闭环关系的当前关键帧的id
-     *          bRobust  是否使用核函数
-     */
+   /**
+    * @brief bundle adjustment 优化过程
+    * 3D-2D 最小化重投影误差 e = (u,v) - project(Tcw*Pw)
+    *
+    * 1. Vertex: g2o::VertexSE3Expmap()，即当前帧的Tcw
+    *            g2o::VertexSBAPointXYZ()，MapPoint的mWorldPos
+    * 2. Edge:
+    *     - g2o::EdgeSE3ProjectXYZ()，BaseBinaryEdge
+    *         + Vertex：待优化当前帧的Tcw
+    *         + Vertex：待优化MapPoint的mWorldPos
+    *         + measurement：MapPoint在当前帧中的二维位置(u,v)
+    *         + InfoMatrix: invSigma2(与特征点所在的尺度有关)
+    *
+    * @param[in] vpKFs                 参与BA的所有关键帧
+    * @param[in] vpMP                  参与BA的所有地图点
+    * @param[in] nIterations           优化迭代次数
+    * @param[in] pbStopFlag            外部控制BA结束标志
+    * @param[in] nLoopKF               形成了闭环的当前关键帧的id
+    * @param[in] bRobust               是否使用核函数
+    * @param[in] fixedKFs              不优化的关键帧(mnId)
+    */
     void static BundleAdjustment(const std::vector<KeyFrame*> &vpKF, const std::vector<MapPoint*> &vpMP,
-                                 int nIterations = 5, bool *pbStopFlag=NULL, const unsigned long nLoopKF=0,
-                                 const bool bRobust = true);
+                                 int nIterations=5, bool *pbStopFlag=nullptr, const unsigned long nLoopKF=0,
+                                 const bool bRobust=true, const std::vector<unsigned long> &fixedKFs={});
 
     /**
      * @brief 进行全局BA优化，但主要功能还是调用 BundleAdjustment,这个函数相当于加了一个壳.
@@ -72,9 +74,11 @@ public:
      * @param[in] pbStopFlag    外界给的控制GBA停止的标志位
      * @param[in] nLoopKF       当前回环关键帧的id，其实也就是参与GBA的关键帧个数
      * @param[in] bRobust       是否使用鲁棒核函数
+     * @param[in] fixedKFs      不优化的关键帧mnId，默认不优化第0帧
      */
-    void static GlobalBundleAdjustemnt(Map* pMap, int nIterations=5, bool *pbStopFlag=NULL,
-                                       const unsigned long nLoopKF=0, const bool bRobust = true);
+    void static GlobalBundleAdjustemnt(Map* pMap, int nIterations=5, bool *pbStopFlag=nullptr,
+                                       const unsigned long nLoopKF=0, const bool bRobust=true,
+                                       const std::vector<unsigned long> &fixedKFs={0});
 
     
 /**
@@ -97,31 +101,11 @@ public:
  * @param pKF        KeyFrame
  * @param pbStopFlag 是否停止优化的标志
  * @param pMap       在优化后，更新状态时需要用到Map的互斥量mMutexMapUpdate
+ * @param fixedPose  是否固定位姿不优化，默认否
  * @note 由局部建图线程调用,对局部地图进行优化的函数
  */
-    void static LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag, Map *pMap);
+    void static LocalBundleAdjustment(KeyFrame* pKF, bool *pbStopFlag, Map *pMap, bool fixedPose=false);
 
-    /**
-     * @brief Pose Only Optimization
-     * 
-     * 3D-2D 最小化重投影误差 e = (u,v) - project(Tcw*Pw) \n
-     * 只优化Frame的Tcw，不优化MapPoints的坐标
-     * 
-     * 1. Vertex: g2o::VertexSE3Expmap()，即当前帧的Tcw
-     * 2. Edge:
-     *     - g2o::EdgeSE3ProjectXYZOnlyPose()，BaseUnaryEdge
-     *         + Vertex：待优化当前帧的Tcw
-     *         + measurement：MapPoint在当前帧中的二维位置(u,v)
-     *         + InfoMatrix: invSigma2(与特征点所在的尺度有关)
-     *     - g2o::EdgeStereoSE3ProjectXYZOnlyPose()，BaseUnaryEdge
-     *         + Vertex：待优化当前帧的Tcw
-     *         + measurement：MapPoint在当前帧中的二维位置(ul,v,ur)
-     *         + InfoMatrix: invSigma2(与特征点所在的尺度有关)
-     *
-     * @param   pFrame Frame
-     * @return  inliers数量
-     */
-    int static PoseOptimization(Frame* pFrame);
 
     // if bFixScale is true, 6DoF optimization (stereo,rgbd), 7DoF otherwise (mono)
     /**
@@ -145,7 +129,7 @@ public:
     void static OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* pCurKF,
                                        const LoopClosing::KeyFrameAndPose &NonCorrectedSim3,
                                        const LoopClosing::KeyFrameAndPose &CorrectedSim3,
-                                       const map<KeyFrame *, set<KeyFrame *> > &LoopConnections,
+                                       const std::map<KeyFrame *, std::set<KeyFrame *> > &LoopConnections,
                                        const bool &bFixScale);
 
     // if bFixScale is true, optimize SE3 (stereo,rgbd), Sim3 otherwise (mono)

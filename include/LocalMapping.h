@@ -24,12 +24,9 @@
 #define LOCALMAPPING_H
 
 #include <mutex>
+#include <list>
 
-#include "KeyFrame.h"
-#include "Map.h"
-#include "LoopClosing.h"
-#include "Tracking.h"
-#include "KeyFrameDatabase.h"
+#include <opencv2/core.hpp>
 
 
 namespace ORB_SLAM2
@@ -38,6 +35,7 @@ namespace ORB_SLAM2
 class Tracking;
 class LoopClosing;
 class Map;
+class KeyFrame;
 
 // 局部建图线程类
 class LocalMapping
@@ -75,7 +73,7 @@ public:
     void InsertKeyFrame(KeyFrame* pKF);
 
     // Thread Synch
-    //外部线程调用,请求停止当前线程的工作
+    // 外部线程调用,请求停止当前线程的工作
     void RequestStop();
 
     // 请求当前线程复位,由外部线程调用,堵塞的
@@ -102,10 +100,7 @@ public:
     // 查看当前是否允许接受关键帧
     bool AcceptKeyFrames();
 
-    /**
-     * @brief 设置"允许接受关键帧"的状态标志
-     * @param[in] flag 是或者否
-     */
+    // 设置"允许接受关键帧"的状态标志
     void SetAcceptKeyFrames(bool flag);
 
     /**
@@ -155,18 +150,23 @@ protected:
     /**
      * @brief 相机运动过程中和共视程度比较高的关键帧通过三角化恢复出一些MapPoints
      */
-    void CreateNewMapPoints();
+    int CreateNewMapPoints();
 
     /**
      * @brief 剔除 ProcessNewKeyFram e和 CreateNewMapPoints 函数中引入的质量不好的MapPoints
+     *
+     * mlpRecentAddedMapPoints：存储新增的地图点，这里是要删除其中不靠谱的
+     *
      * @see VI-B recent map points culling
      */
     void MapPointCulling();
 
     /**
      * @brief 检查并融合当前关键帧与相邻帧（两级相邻）重复的MapPoints
+     *
+     * @note 此函数可能会给邻居和当前关键帧添加新的地图点-特征点对应关系
      */
-    void SearchInNeighbors();
+    void FusePointsInNeighbors();
 
     /**
      * @brief 关键帧剔除
@@ -189,7 +189,7 @@ protected:
      * @param[in] v     三维向量
      * @return cv::Mat  反对称矩阵
      */
-    cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
+    static cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
 
     // 检查当前是否有复位线程的请求
     void ResetIfRequested();

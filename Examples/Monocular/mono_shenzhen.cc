@@ -5,23 +5,26 @@
 #include <iostream>
 #include <algorithm>
 #include <filesystem>
-#include <opencv2/core/core.hpp> // cv::imread()
+#include <optional>
+
+#include <opencv2/imgcodecs.hpp> // cv::imread()
 #include <fmt/format.h>          // fmt::format()
 #include <happly/happly.h>       // write ply file
 #include <glog/logging.h>        // logging
 #include <toml++/toml.h>         // parse .toml
 #include <Eigen/Dense>           // eigen::Matrix
 
+#include "Tracking.h"
 #include "System.h"
 
-using namespace std;
+
 namespace fs = std::filesystem;
 
 
-vector<string> loadImages(const string &file)
+std::vector<std::string> loadImages(const std::string &file)
 {
-  vector<string> imagesPath;
-  ifstream f(file);
+  std::vector<std::string> imagesPath;
+  std::ifstream f(file);
   while (f)
   {
     std::string location;
@@ -31,62 +34,94 @@ vector<string> loadImages(const string &file)
   return imagesPath;
 }
 
-vector<Eigen::Vector3d> loadCamerasPose(const string &filepath, bool src_is_ue4= true)
+/**
+ * 解析采集数据，设置相机位姿Tco（世界坐标系和相机坐标系同为前z，右x，下y），并返回。
+ *
+ * @param[in]  filepath 真实世界坐标系下的相机位姿。
+ * @param[out] revertTransform 将原点坐标系o下点转换到真实世界坐标系。
+ * @return Tco array
+ */
+std::vector<Sophus::SE3d> loadCamerasPose(const std::string &filepath, Eigen::Matrix3d revertTransform)
 {
-  ifstream f(filepath);
+  std::ifstream f(filepath);
   if (!f.is_open())
   {
     LOG(INFO) << fmt::format("loadCamerasPose can not open file: {}.", filepath);
     return {};
   }
   f.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // 忽略第一行注释
-  vector<Eigen::Vector3d> positions;
+  // UE4坐标系：前x，右y，上z
+  // AirSim坐标系：前x，右y，下z
+  // ORB_SLAM2中的坐标系：前z，右x，下y
+  Eigen::Matrix3d TWaxisToCaxis; // 前x，右y，下z坐标系变成前z，右x，下y坐标系
+  TWaxisToCaxis <<
+                0, 1, 0,
+    0, 0, 1,
+    1, 0, 0;
+  // 将世界坐标转换为以第一个相机朝向构建的ORB_SLAM2坐标，
+  // 原点为原世界坐标原点经过上述转换后的点。
+  Eigen::Matrix3d Row;
+  bool isOriginInitialized = false;
+  std::vector<Sophus::SE3d> Tco_s;
   while (f)
   {
     // [position] x y z [rotation] x y z w
     double x, y, z, rx, ry, rz, rw;
     f >> x >> y >> z >> rx >> ry >> rz >> rw;
-    if (src_is_ue4)
-    {
-      // ORB-SLAM是右手系，而UE4是左手系，AirSim是右手系
-      double t = y;
-      y = z;
-      z = t;
-    }
     if (f)
-      positions.emplace_back(x, y, z);
+    {
+      z = -z; // UE4 => AirSim 世界坐标系
+      const Eigen::Quaterniond Qwc(rw, rx, ry, rz); // UE4 的Roll、Pitch、Yaw反而是右手系，不需要变换
+      const Eigen::Vector3d twc(x, y, z);
+      if (!isOriginInitialized)
+      {
+        Row = Qwc.inverse().matrix();
+        isOriginInitialized = true;
+      }
+      const Eigen::Matrix3d Roc = Row * Qwc; // AirSim => ORB_SLAM2
+      const Eigen::Vector3d toc = TWaxisToCaxis * Row * twc;
+      //LOG(INFO) << "Camera Orientation:\n" << Qwc.matrix();
+      //LOG(INFO) << "Camera Position:\n" << twc;
+      const Sophus::SE3d Toc(Roc, toc);
+      Tco_s.emplace_back(Toc.inverse());
+    }
   }
-  return positions;
+  revertTransform = Row.inverse() * TWaxisToCaxis.inverse();
+  return Tco_s;
 }
 
 // Main
 int Main(int argc, char* argv[])
 {
   toml::table args;
-  try {
+  try
+  {
     args = toml::parse_file(argv[1]);
-  } catch (const toml::parse_error& e) {
+  } catch (const toml::parse_error& e)
+  {
     LOG(ERROR) << fmt::format("toml::parse_file cause error in {}->{}(...).", __FILE__, __FUNCTION__ );
     throw;
   }
 
   // Retrieve paths to images
-  vector<string> imagesFilename = ::loadImages(args["ImagesCollectionPath"].ref<std::string>());
-  vector<Eigen::Vector3d> camerasPosition = ::loadCamerasPose(args["CameraPoseCollectionPath"].ref<std::string>());
-  assert(imagesFilename.size() == camerasPosition.size());
+  auto imagesFilename = loadImages(args["ImagesCollectionPath"].ref<std::string>());
+  Eigen::Matrix3d revertM;
+  auto camerasPosition = loadCamerasPose(args["CameraPoseCollectionPath"].ref<std::string>(),
+                                         revertM);
+  if (imagesFilename.size() != camerasPosition.size())
+    throw std::runtime_error("Sizes of 'ImagesCollectionPath' and 'CameraPoseCollectionPath' are not equal!");
 
-  // Create slamSystem system. It initializes all system threads and gets ready to process frames.
+  // Create slamSystem system.
+  // It initializes all system threads and gets ready to process frames.
   ORB_SLAM2::System slamSystem(args["FBoWVocabularyPath"].ref<std::string>(),
                                args["ORBSLAMConfigPath"].ref<std::string>(),
-                               ORB_SLAM2::System::MONOCULAR, true);
-
+                               true);
 
   // Main loop
   double timeStamp = 0.0;
-  for(int i=0, iend=imagesFilename.size(); i < iend; ++i)
+  for(size_t i=0, iend=imagesFilename.size(); i < iend; ++i)
   {
-    // Pause for mapping thread to generate more map points.
-    std::this_thread::sleep_for(0.5s);
+    this_thread::sleep_for(0.5s);
 
     // Read image from file
     cv::Mat im = cv::imread(imagesFilename[i], cv::IMREAD_UNCHANGED);
@@ -97,64 +132,14 @@ int Main(int argc, char* argv[])
     }
 
     // Pass the image to the slamSystem system
-    Eigen::Matrix4d poseTcw;
-    cv::Mat Tcw = slamSystem.TrackMonocular(im, (timeStamp += 0.1));
-    if (!Tcw.empty())
-    {
-      poseTcw << Tcw.at<float>(0, 0), Tcw.at<float>(0, 1), Tcw.at<float>(0, 2), Tcw.at<float>(0, 3),
-                 Tcw.at<float>(1, 0), Tcw.at<float>(1, 1), Tcw.at<float>(1, 2), Tcw.at<float>(1, 3),
-                 Tcw.at<float>(2, 0), Tcw.at<float>(2, 1), Tcw.at<float>(2, 2), Tcw.at<float>(2, 3),
-                 Tcw.at<float>(3, 0), Tcw.at<float>(3, 1), Tcw.at<float>(3, 2), Tcw.at<float>(3, 3);
-      LOG(INFO) << "poseTcw is:\n" << poseTcw << endl;
-    }
+    int trackState = slamSystem.TrackMonocularWithPose(im, (timeStamp+=0.1), camerasPosition[i]);
 
     // Compute the depth of each tracked key points.
-    if (slamSystem.GetTrackingState() == ORB_SLAM2::Tracking::eTrackingState::OK)
+    if (trackState == ORB_SLAM2::Tracking::State::OK)
     {
       const std::string trackedFilePrefix = "../../Examples/Monocular/Out";
       const std::string trackedFilename = fmt::format("{}/trackPoints{}.ply", trackedFilePrefix, i);
-      std::ofstream trackedFile(trackedFilename);
-      if (!trackedFile.is_open())
-      {
-        LOG(INFO) << fmt::format("Write to {} failed. It is not open.\n", trackedFilename);
-        continue;
-      }
-      auto keyPoints = slamSystem.GetTrackedKeyPointsUn();
-      auto mapPoints = slamSystem.GetTrackedMapPoints();
-      assert(keyPoints.size() == mapPoints.size());
-      // Save the results as .ply file.
-      happly::PLYData plyFile;
-      std::vector<std::array<double, 3>> vertexesPos;
-      std::vector<std::array<uchar, 3>> vertexesColor;
-      std::vector<float> vertexesPtX;
-      std::vector<float> vertexesPtY;
-      std::vector<uchar> vertexesPtOctave;
-      const int N = keyPoints.size();
-      for (int i=0; i<N; ++i)
-      {
-        auto* mpt = mapPoints[i];
-        const auto& kpt = keyPoints[i];
-        if (mpt && !mpt->isBad())
-        {
-          cv::Mat wpos = mpt->GetWorldPos();
-          Eigen::Matrix<double, 4, 1> wpos_homo; wpos_homo << wpos.at<float>(0), wpos.at<float>(1), wpos.at<float>(2), 1.f;
-          Eigen::Matrix<double, 4, 1> camPos = poseTcw * wpos_homo;
-          // LOG(INFO) << '\n' << poseTcw << "\n@\n" << wpos_homo << "\n=\n" << camPos;
-          vertexesPos.emplace_back(std::array<double,3>{ camPos.x(), camPos.y(), camPos.z() });
-          vertexesPtX.emplace_back(kpt.pt.x);
-          vertexesPtY.emplace_back(kpt.pt.y);
-          vertexesPtOctave.emplace_back(kpt.octave);
-          const auto& ptColor = im.at<cv::Vec3b>(kpt.pt.y, kpt.pt.x);
-          vertexesColor.emplace_back(std::array<uchar,3>{ptColor[2], ptColor[1], ptColor[0]});  // r, g, b
-        }
-      }
-      const size_t M = vertexesPos.size();
-      plyFile.addVertexPositions(vertexesPos);
-      plyFile.addVertexColors(vertexesColor);
-      plyFile.getElement("vertex").addProperty<float>("ix", vertexesPtX);
-      plyFile.getElement("vertex").addProperty<float>("iy", vertexesPtY);
-      plyFile.getElement("vertex").addProperty<uchar>("octave", vertexesPtOctave);
-      plyFile.write(trackedFile);
+      slamSystem.SaveTrackedMap(trackedFilename);
     }
   }
 
@@ -163,9 +148,6 @@ int Main(int argc, char* argv[])
 
   // Stop all threads
   slamSystem.Shutdown();
-
-  // Save camera trajectory
-  slamSystem.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
 
   slamSystem.SaveMap("../../Examples/Monocular/Out/Map.ply");
 
@@ -181,12 +163,15 @@ int main(int argc, char* argv[])
     LOG(INFO) << fmt::format("Usage: {} launch_toml_path.", argv[0]);
     return EXIT_FAILURE;
   }
-  int r=EXIT_FAILURE;
-  try {
+  int r = EXIT_FAILURE;
+  try
+  {
     r=::Main(argc, argv);
-  } catch (const std::exception &e) {
+  } catch (const std::exception &e)
+  {
     LOG(ERROR) << fmt::format("Catch exception: {}.", e.what());
-  } catch (...) {
+  } catch (...)
+  {
     LOG(ERROR) << "Unknown exception.";
   }
   return r;

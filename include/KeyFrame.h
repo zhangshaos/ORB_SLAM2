@@ -23,16 +23,14 @@
 #define KEYFRAME_H
 
 #include <mutex>
+#include <vector>
+#include <set>
 
+#include "opencv2/opencv.hpp"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 
-#include "MapPoint.h"
 #include "ORBVocabulary.h"
-#include "ORBextractor.h"
-#include "Frame.h"
-#include "KeyFrameDatabase.h"
-
 
 namespace ORB_SLAM2
 {
@@ -41,6 +39,7 @@ class Map;
 class MapPoint;
 class Frame;
 class KeyFrameDatabase;
+
 
 /**
  * @brief 关键帧类
@@ -332,11 +331,11 @@ public:
     const float mfGridElementHeightInv;
 
     // Variables used by the tracking
-    long unsigned int mnTrackReferenceForFrame;     // 记录它
+    long unsigned int mnTrackReferenceForFrame;     // 标记当前关键帧为 mnTrackReferenceForFrame 帧的局部关键帧
     long unsigned int mnFuseTargetForKF;            // 标记在局部建图线程中,和哪个关键帧进行融合的操作
 
     // Variables used by the local mapping
-    // local mapping 中记录当前处理的关键帧的mnId，表示当前局部BA的关键帧id。mnBALocalForKF 在 mappoint.h里面也有同名的变量。
+    // local mapping 中记录当前处理的关键帧的mnId，表示当前局部BA的关键帧id。mnLocalBAForKF 在 mappoint.h里面也有同名的变量。
     long unsigned int mnBALocalForKF;
     // local mapping 中记录当前处理的关键帧的mnId, 只是提供约束信息但是却不会去优化这个关键帧
     long unsigned int mnBAFixedForKF;           
