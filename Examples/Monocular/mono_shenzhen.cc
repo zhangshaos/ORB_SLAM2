@@ -38,10 +38,10 @@ std::vector<std::string> loadImages(const std::string &file)
  * 解析采集数据，设置相机位姿Tco（世界坐标系和相机坐标系同为前z，右x，下y），并返回。
  *
  * @param[in]  filepath 真实世界坐标系下的相机位姿。
- * @param[out] revertTransform 将原点坐标系o下点转换到真实世界坐标系。
+ * @param[out] revertTransform 将原点坐标系o下点转换到真实世界坐标系，默认为空。
  * @return Tco array
  */
-std::vector<Sophus::SE3d> loadCamerasPose(const std::string &filepath, Eigen::Matrix3d revertTransform)
+std::vector<Sophus::SE3d> loadCamerasPose(const std::string &filepath, Sophus::SE3d *revertTransform=nullptr)
 {
   std::ifstream f(filepath);
   if (!f.is_open())
@@ -53,14 +53,8 @@ std::vector<Sophus::SE3d> loadCamerasPose(const std::string &filepath, Eigen::Ma
   // UE4坐标系：前x，右y，上z
   // AirSim坐标系：前x，右y，下z
   // ORB_SLAM2中的坐标系：前z，右x，下y
-  Eigen::Matrix3d TWaxisToCaxis; // 前x，右y，下z坐标系变成前z，右x，下y坐标系
-  TWaxisToCaxis <<
-                0, 1, 0,
-    0, 0, 1,
-    1, 0, 0;
   // 将世界坐标转换为以第一个相机朝向构建的ORB_SLAM2坐标，
-  // 原点为原世界坐标原点经过上述转换后的点。
-  Eigen::Matrix3d Row;
+  Sophus::SE3d Tow;
   bool isOriginInitialized = false;
   std::vector<Sophus::SE3d> Tco_s;
   while (f)
@@ -71,22 +65,35 @@ std::vector<Sophus::SE3d> loadCamerasPose(const std::string &filepath, Eigen::Ma
     if (f)
     {
       z = -z; // UE4 => AirSim 世界坐标系
-      const Eigen::Quaterniond Qwc(rw, rx, ry, rz); // UE4 的Roll、Pitch、Yaw反而是右手系，不需要变换
-      const Eigen::Vector3d twc(x, y, z);
+      const Eigen::Quaterniond Rwc_(rw, rx, ry, rz); // UE4 的Roll、Pitch、Yaw反而是右手系，不需要变换
+      const Eigen::Vector3d eulerYawPitchRoll = Rwc_.matrix().eulerAngles(2, 1, 0);
+      Eigen::Quaterniond Rwc =
+        Eigen::AngleAxisd(eulerYawPitchRoll[0], Eigen::Vector3d::UnitY()) *
+        Eigen::AngleAxisd(eulerYawPitchRoll[1], Eigen::Vector3d::UnitX()) *
+        Eigen::AngleAxisd(eulerYawPitchRoll[2], Eigen::Vector3d::UnitZ());
+      const Eigen::Vector3d twc(y, z, x);
+      Sophus::SE3d Twc(Rwc, twc);
       if (!isOriginInitialized)
       {
-        Row = Qwc.inverse().matrix();
+        Sophus::SE3d Two( Twc.matrix() );
+        Tow = Two.inverse();
         isOriginInitialized = true;
       }
-      const Eigen::Matrix3d Roc = Row * Qwc; // AirSim => ORB_SLAM2
-      const Eigen::Vector3d toc = TWaxisToCaxis * Row * twc;
-      //LOG(INFO) << "Camera Orientation:\n" << Qwc.matrix();
-      //LOG(INFO) << "Camera Position:\n" << twc;
-      const Sophus::SE3d Toc(Roc, toc);
-      Tco_s.emplace_back(Toc.inverse());
+      Sophus::SE3d Toc = Tow * Twc;
+      const Eigen::Vector3d oneStep(0, 0, 1);
+      const Eigen::Vector3d endPos = Toc * oneStep;
+      const Eigen::Vector3d startPos = Toc * Eigen::Vector3d::Zero();
+      const Eigen::Vector3d dir = (endPos - startPos).normalized();
+      LOG(INFO)
+      << "Camera Pose Toc:\n" << Toc.matrix()
+      << "\nStart Pos: " << startPos.transpose()
+      << "\nEnd Pos: " << endPos.transpose()
+      << "\nDirection is: " << dir.transpose();
+       Tco_s.emplace_back(Toc.inverse());
     }
   }
-  revertTransform = Row.inverse() * TWaxisToCaxis.inverse();
+  if (revertTransform)
+    *revertTransform = Tow.inverse();
   return Tco_s;
 }
 
@@ -105,11 +112,16 @@ int Main(int argc, char* argv[])
 
   // Retrieve paths to images
   auto imagesFilename = loadImages(args["ImagesCollectionPath"].ref<std::string>());
-  Eigen::Matrix3d revertM;
-  auto camerasPosition = loadCamerasPose(args["CameraPoseCollectionPath"].ref<std::string>(),
-                                         revertM);
-  if (imagesFilename.size() != camerasPosition.size())
+  Sophus::SE3d revertM;
+  auto camerasPose = loadCamerasPose(args["CameraPoseCollectionPath"].ref<std::string>(),
+                                     &revertM);
+  if (imagesFilename.size() != camerasPose.size())
+  {
+    LOG(INFO)
+    << "imagesFilename.size(): " << imagesFilename.size()
+    << "\ncamerasPose.size(): " << camerasPose.size();
     throw std::runtime_error("Sizes of 'ImagesCollectionPath' and 'CameraPoseCollectionPath' are not equal!");
+  }
 
   // Create slamSystem system.
   // It initializes all system threads and gets ready to process frames.
@@ -132,7 +144,9 @@ int Main(int argc, char* argv[])
     }
 
     // Pass the image to the slamSystem system
-    int trackState = slamSystem.TrackMonocularWithPose(im, (timeStamp+=0.1), camerasPosition[i]);
+    int trackState = slamSystem.TrackMonocularWithPose(im, (timeStamp+=0.1),
+                                                       camerasPose[i],
+                                                       imagesFilename[i]);
 
     // Compute the depth of each tracked key points.
     if (trackState == ORB_SLAM2::Tracking::State::OK)
@@ -143,13 +157,13 @@ int Main(int argc, char* argv[])
     }
   }
 
-  LOG(INFO) << "\nPress ENTER to shut down the SLAM system.\n";
+  LOG(INFO) << "\nPress ENTER to shut down the SLAM system...\n";
   std::cin.get();
 
   // Stop all threads
   slamSystem.Shutdown();
 
-  slamSystem.SaveMap("../../Examples/Monocular/Out/Map.ply");
+  slamSystem.SaveMap("../../Examples/Monocular/Out/Map.ply", &revertM);
 
   return 0;
 }

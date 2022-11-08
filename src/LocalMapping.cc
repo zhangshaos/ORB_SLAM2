@@ -101,7 +101,10 @@ void LocalMapping::Run()
             // Step 4 当前关键帧与相邻关键帧通过三角化产生新的地图点，使得跟踪更稳
             // 新点将被送入 mlpRecentAddedMapPoints 等待后续处理
             int nNewPoint = CreateNewMapPoints();
-            LOG(INFO) << "LocalMapping: New Points with triangulation: " << nNewPoint;
+            LOG(INFO)
+            << "LocalMapping: New Points with triangulation: " << nNewPoint
+            << " for KF: " << mpCurrentKeyFrame->mnId;
+
 
             // 已经处理完队列中的最后的一个关键帧
             if(!CheckNewKeyFrames())
@@ -653,7 +656,7 @@ bool LocalMapping::Stop()
     if(mbStopRequested && !mbNotStop)
     {
         mbStopped = true;
-        LOG(INFO) << "Local Mapping STOP" << endl;
+        LOG(INFO) << "Local Mapping STOP" << '\n';
         return true;
     }
     return false;
@@ -688,7 +691,7 @@ void LocalMapping::Release()
         delete pKF;
     mlNewKeyFrames.clear();
 
-    LOG(INFO) << "Local Mapping RELEASE" << endl;
+    LOG(INFO) << "Local Mapping RELEASE" << '\n';
 }
 
 // 查看当前是否允许接受关键帧
@@ -814,7 +817,7 @@ void LocalMapping::KeyFrameCulling()
 
         // Step 4：如果该关键帧90%以上的有效地图点被判断为冗余的，则认为该关键帧是冗余的，需要删除该关键帧
         if(nRedundantObservations>0.9*nMPs)
-            pKF->SetBadFlag();
+          pKF->EraseAndSetBad();
     }
 }
 

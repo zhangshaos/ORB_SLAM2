@@ -72,8 +72,8 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
   mpORBvocabulary(F.mpORBvocabulary),
   mbFirstConnection(true),
   mpParent(nullptr),
-  mbNotErase(false),
-  mbToBeErased(false),
+  mbPreventErase(false),
+  mbShouldErase(false),
   mbBad(false),
   mpMap(pMap)
 {
@@ -601,7 +601,7 @@ bool KeyFrame::hasChild(KeyFrame *pKF)
 void KeyFrame::AddLoopEdge(KeyFrame *pKF)
 {
   unique_lock<mutex> lockCon(mMutexConnections);
-  mbNotErase = true;
+  mbPreventErase = true;
   mspLoopEdges.insert(pKF);
 }
 
@@ -613,17 +613,17 @@ set<KeyFrame*> KeyFrame::GetLoopEdges()
 }
 
 // 设置当前关键帧不要在优化的过程中被删除. 由回环检测线程调用
-void KeyFrame::SetNotErase()
+void KeyFrame::PreventEraseInKFCulling()
 {
   unique_lock<mutex> lock(mMutexConnections);
-  mbNotErase = true;
+  mbPreventErase = true;
 }
 
 /**
  * @brief 删除当前的这个关键帧,表示不进行回环检测过程;由回环检测线程调用
  *
  */
-void KeyFrame::SetErase()
+void KeyFrame::PermitEraseInKFCulling()
 {
   {
     unique_lock<mutex> lock(mMutexConnections);
@@ -631,14 +631,14 @@ void KeyFrame::SetErase()
     // 如果当前关键帧和其他的关键帧没有形成回环关系,那么就删吧
     if(mspLoopEdges.empty())
     {
-      mbNotErase = false;
+      mbPreventErase = false;
     }
   }
 
-  // mbToBeErased：删除之前记录的想要删但时机不合适没有删除的帧
-  if(mbToBeErased)
+  // mbShouldErase：删除之前记录的想要删但时机不合适没有删除的帧
+  if(mbShouldErase)
   {
-    SetBadFlag();
+    EraseAndSetBad();
   }
 }
 
@@ -648,9 +648,9 @@ void KeyFrame::SetErase()
  *
  * mbNotErase作用：表示要删除该关键帧及其连接关系但是这个关键帧有可能正在回环检测或者计算sim3操作，这时候虽然这个关键帧冗余，但是却不能删除，
  * 仅设置mbNotErase为true，这时候调用setbadflag函数时，不会将这个关键帧删除，只会把mbTobeErase变成true，代表这个关键帧可以删除但不到时候,先记下来以后处理。
- * 在闭环线程里调用 SetErase()会根据mbToBeErased 来删除之前可以删除还没删除的帧。
+ * 在闭环线程里调用 PermitEraseInKFCulling()会根据mbToBeErased 来删除之前可以删除还没删除的帧。
  */
-void KeyFrame::SetBadFlag()
+void KeyFrame::EraseAndSetBad()
 {
   // Step 1 首先处理一下删除不了的特殊情况
   {
@@ -659,10 +659,10 @@ void KeyFrame::SetBadFlag()
     // 第0关键帧不允许被删除
     if(mnId==0)
       return;
-    else if(mbNotErase)
+    else if(mbPreventErase)
     {
       // mbNotErase表示不应该删除，于是把mbToBeErased置为true，假装已经删除，其实没有删除
-      mbToBeErased = true;
+      mbShouldErase = true;
       return;
     }
   }

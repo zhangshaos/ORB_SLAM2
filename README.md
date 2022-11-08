@@ -9,6 +9,20 @@
 2. 编译生成CMake目标 mono_shenzhen 。
 3. 运行 `./mono_shenzhen ./launch.toml` ，在Out/目录下保存结果。
 
+## 注意
+- ORB_SLAM 地图初始化时，最好不要旋转视角，否则会导致很多错误匹配，导致初始化失败。
+  > 从实验测试上看，当初始化含有旋转时，**匹配数量和正确匹配占比都减小**了。  
+  > 无旋转：  
+  > nGood: 122, nBadInfinite: 0, nBadParallax: 5, nBadDepth: 16, nBadProject: 37  
+  > （180个匹配，好匹配占比为0.68）  
+  > 有旋转：  
+  > nGood: 52, nBadInfinite: 0, nBadParallax: 23, nBadDepth: 34, nBadProject: 30  
+  > （139个匹配，好匹配占比0.37）  
+  > nGood: 58, nBadInfinite: 0, nBadParallax: 25, nBadDepth: 29, nBadProject: 23  
+  > （135个匹配，好匹配占比0.43）  
+  > nGood: 30, nBadInfinite: 0, nBadParallax: 5, nBadDepth: 18, nBadProject: 48  
+  > （101个匹配，好匹配占比0.30）  
+  > 从很多数据上看，初始化的旋转导致视角太小，深度为负，这些应该是错误的特征点匹配导致的。  
 
 # ORB-SLAM2
 **Authors:** [Raul Mur-Artal](http://webdiis.unizar.es/~raulmur/), [Juan D. Tardos](http://webdiis.unizar.es/~jdtardos/), [J. M. M. Montiel](http://webdiis.unizar.es/~josemari/) and [Dorian Galvez-Lopez](http://doriangalvez.com/) ([DBoW2](https://github.com/dorian3d/DBoW2))

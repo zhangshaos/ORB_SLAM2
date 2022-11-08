@@ -137,14 +137,14 @@ bool LoopClosing::DetectLoop()
     // 取出关键帧后从队列里弹出该关键帧
     mlpLoopKeyFrameQueue.pop_front();
     // 设置当前关键帧不要在当前线程优化的过程中被删除
-    mpCurrentKF->SetNotErase();
+    mpCurrentKF->PreventEraseInKFCulling();
   }
 
   // Step 2：如果距离上次闭环没多久（小于10帧），或者map中关键帧总共还没有10帧，则不进行闭环检测
   if(mpCurrentKF->mnId < mLastCorrectLoopKFid + 10)
   {
     mpKeyFrameDB->add(mpCurrentKF);
-    mpCurrentKF->SetErase();
+    mpCurrentKF->PermitEraseInKFCulling();
     return false;
   }
 
@@ -166,7 +166,7 @@ bool LoopClosing::DetectLoop()
       minScore = score;
   }
 
-  // Step 4：在所有关键帧中找出闭环候选帧（注意不和当前帧连接）
+  // Step 4：在所有关键帧中找出闭环候选帧，排除那些和当前帧连接的候选帧
   // minScore的作用：认为和当前关键帧具有回环关系的关键帧,不应该低于当前关键帧的相邻关键帧的最低的相似度minScore
   // 得到的这些关键帧,和当前关键帧具有较多的公共单词,并且相似度评分都挺高
   vector<KeyFrame*> vpCandidateKFs = mpKeyFrameDB->DetectLoopCandidates(mpCurrentKF, minScore);
@@ -176,7 +176,7 @@ bool LoopClosing::DetectLoop()
   {
     mpKeyFrameDB->add(mpCurrentKF);
     mvLastConsistentGroups.clear();
-    mpCurrentKF->SetErase();
+    mpCurrentKF->PermitEraseInKFCulling();
     return false;
   }
 
@@ -206,8 +206,8 @@ bool LoopClosing::DetectLoop()
 
       // Step 5.4：判断当前KF『候选组』是否与之前的『连续组』存在连续关系
       bool bConsistent = false;
-      for(auto sit : candiKFGroup)
-        if(sPreviousGroup.count(sit))
+      for(auto KF : candiKFGroup)
+        if(sPreviousGroup.count(KF))
         {
           bConsistent=true;
           bConsistentWithPreviousGroup=true;
@@ -253,7 +253,7 @@ bool LoopClosing::DetectLoop()
   if(mvpBetterCandidates.empty())
   {
     // 未检测到闭环，返回false
-    mpCurrentKF->SetErase();
+    mpCurrentKF->PermitEraseInKFCulling();
     return false;
   }
   else
@@ -298,7 +298,7 @@ bool LoopClosing::CheckCurKFsTcwAndLoopMPs()
     KeyFrame* pKF = mvpBetterCandidates[i];
 
     // 避免在LocalMapping中KeyFrameCulling函数将此关键帧作为冗余帧剔除
-    pKF->SetNotErase();
+    pKF->PreventEraseInKFCulling();
 
     // 如果候选帧质量不高，直接PASS
     if(pKF->isBad())
@@ -414,9 +414,9 @@ bool LoopClosing::CheckCurKFsTcwAndLoopMPs()
   {
     // 如果没有一个闭环匹配候选帧通过Sim3的求解与优化
     for(int i=0; i<nInitialCandidates; i++)
-      mvpBetterCandidates[i]->SetErase();
+      mvpBetterCandidates[i]->PermitEraseInKFCulling();
     // 当前关键帧也将不会再参加回环检测了
-    mpCurrentKF->SetErase();
+    mpCurrentKF->PermitEraseInKFCulling();
     return false;
   }
 
@@ -452,15 +452,15 @@ bool LoopClosing::CheckCurKFsTcwAndLoopMPs()
     // 如果当前回环可靠，保留当前待闭环关键帧，其他闭环候选全部删掉以后不用了
     for(int i=0; i<nInitialCandidates; i++)
       if(mvpBetterCandidates[i] != mpMatchedKF)
-        mvpBetterCandidates[i]->SetErase();
+        mvpBetterCandidates[i]->PermitEraseInKFCulling();
     return true;
   }
   else
   {
     // 闭环不可靠，闭环候选及当前待闭环帧全部删除
     for(int i=0; i<nInitialCandidates; i++)
-      mvpBetterCandidates[i]->SetErase();
-    mpCurrentKF->SetErase();
+      mvpBetterCandidates[i]->PermitEraseInKFCulling();
+    mpCurrentKF->PermitEraseInKFCulling();
     return false;
   }
 }
@@ -475,7 +475,7 @@ bool LoopClosing::CheckCurKFsTcwAndLoopMPs()
  */
 void LoopClosing::CorrectLoop()
 {
-  LOG(INFO) << "Loop detected!" << endl;
+  LOG(INFO) << "Loop detected!" << '\n';
   // Step 0：结束局部地图线程、全局BA，为闭环矫正做准备
   // 请求局部地图停止，防止在回环矫正时局部地图线程中InsertKeyFrame函数插入新的关键帧
   mpLocalMapper->RequestStop();
@@ -665,7 +665,7 @@ void LoopClosing::CorrectLoop()
   }
 
   // Optimize graph
-  // Step 6：进行本质图优化，优化本质图中所有关键帧的位姿和地图点
+  // Step 6：进行本质图优化，优化本质图中所有关键帧的位姿
   // newConnectForCurKFGroup 是形成回环后新生成的连接关系，不包括步骤7中当前帧与回环匹配帧之间的连接关系
   Optimizer::OptimizeEssentialGraph(mpMap, mpMatchedKF, mpCurrentKF, mapNonCorrectedsTiw, mapCorrectedsTiw, newConnectForCurKFGroup, false);
 
@@ -683,7 +683,7 @@ void LoopClosing::CorrectLoop()
 
   // Loop closed. Release Local Mapping.
   mpLocalMapper->Release();
-  LOG(INFO) << "Loop Closed!" << endl;
+  LOG(INFO) << "Loop Closed!" << '\n';
   mLastCorrectLoopKFid = mpCurrentKF->mnId;
 }
 
@@ -776,7 +776,7 @@ void LoopClosing::ResetIfRequested()
  */
 void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 {
-  LOG(INFO) << "Starting Global Bundle Adjustment" << endl;
+  LOG(INFO) << "Starting Global Bundle Adjustment" << '\n';
 
   // 记录GBA已经迭代次数,用来检查全局BA过程是否是因为意外结束的
   int idx =  mnFullBAIdx;
@@ -811,8 +811,8 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
     // 而如果被强行中断的线程退出时新的线程还没有启动,那么上面的条件就不起作用了(虽然概率很小,前面的程序中mbStopGBA置位后很快mnFullBAIdx就++了,保险起见),所以这里要再判断一次
     if(!mbStopGBA)
     {
-      LOG(INFO) << "Global Bundle Adjustment finished" << endl
-                << "Updating map ..." << endl;
+      LOG(INFO) << "Global Bundle Adjustment finished" << '\n'
+                << "Updating map ..." << '\n';
       mpLocalMapper->RequestStop();
 
       // Wait until Local Mapping has effectively stopped
@@ -911,7 +911,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
       // 释放
       mpLocalMapper->Release();
 
-      LOG(INFO) << "Map updated!" << endl;
+      LOG(INFO) << "Map updated!" << '\n';
     }
 
     mbFinishedGBA = true;

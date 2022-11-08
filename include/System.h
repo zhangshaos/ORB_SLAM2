@@ -47,7 +47,7 @@ class System
 public:
     System(const string &strVocFile,            //指定ORB字典文件的路径
            const string &strSettingsFile,       //指定配置文件的路径
-           const bool bUseViewer = true);       //指定是否使用可视化界面
+           bool bUseViewer = true);       //指定是否使用可视化界面
 
     /**
      * 给定输入
@@ -55,10 +55,12 @@ public:
      * @param[in] im RGB|RGBA|Gray 图片
      * @param[in] timestamp 时间戳
      * @param[in] poseTcw 当前相机位姿（坐标系为相机坐标系：前z，右x，下y）
+     * @param[in] imName 输入图像文件名
      * @return Tracking::State
      */
     int TrackMonocularWithPose(const cv::Mat &im, double timestamp,
-                                           const Sophus::SE3d& poseTcw);
+                               const Sophus::SE3d& poseTcw,
+                               const std::string& imName);
 
     // 获取从上次调用本函数后是否发生了比较大的地图变化
     bool MapChanged();
@@ -72,9 +74,15 @@ public:
     // 关闭系统，这将会关闭所有线程并且丢失曾经的各种数据
     void Shutdown();
 
-    // 保存整个地图
-    bool SaveMap(const string &filename);
-    bool LoadMap(const string &filename);
+    /**
+     * 保存整个地图。
+     *
+     * @param filename[in]          保存文件路径（文件名）
+     * @param revertTransform[in]   将ORB_SLAM2世界地图点转换为真实世界地图点，默认为空
+     * @return
+     */
+    bool SaveMap(const string &filename, const Sophus::SE3d *revertTransform=nullptr);
+    //bool LoadMap(const string &filename);
 
     // Information from most recent processed frame
     // You can call this right after TrackMonocular (or stereo or RGBD)
@@ -149,6 +157,8 @@ protected:
     Sophus::SE3d mInPoseTcw;
     // 存储当前系统输入图片
     cv::Mat mInImage;
+    // 存储当前输入图片文件名
+    std::string mInImageName;
 };
 
 }// namespace ORB_SLAM

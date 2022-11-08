@@ -169,8 +169,10 @@ public:
    * @see Tracking::TrackLocalMap()
    */
   void IncreaseFound(int n=1);
+
   //? 这个比例是?
   float GetFoundRatio();
+
   /**
    * @brief 获取被找到的次数
    *
@@ -214,11 +216,11 @@ public:
   int PredictScale(const float &currentDist, Frame* pF);
 
 public:
-  long unsigned int mnId; ///< Global ID for MapPoint
+  long unsigned int mnId;       // Global ID for MapPoint
   static long unsigned int nNextId;
-  const long int mnFirstKFid; ///< 创建该MapPoint的关键帧ID
-  //呐,如果是从帧中创建的话,会将普通帧的id存放于这里
-  const long int mnFirstFrame; ///< 创建该MapPoint的帧ID（即每一关键帧有一个帧ID）
+  const long int mnFirstKFid;   // 创建该MapPoint的关键帧ID
+  // 呐,如果是从帧中创建的话,会将普通帧的id存放于这里
+  const long int mnFirstFrame;  // 创建该MapPoint的帧ID（即每一关键帧有一个帧ID）
 
   // 被观测到的相机数目，单目+1，双目或RGB-D则+2
   int nObs;
@@ -285,15 +287,15 @@ protected:
   // 通过 ComputeDistinctiveDescriptors() 得到的最有代表性描述子,距离其它描述子的平均距离最小
   cv::Mat mDescriptor;
 
-  /// Reference KeyFrame
+  // Reference KeyFrame
   // 通常情况下MapPoint的参考关键帧就是创建该MapPoint的那个关键帧
   KeyFrame* mpRefKF;
 
-  /// Tracking counters
+  // Tracking counters
   int mnVisible;
   int mnFound;
 
-  /// Bad flag (we do not currently erase MapPoint from memory)
+  // Bad flag (we do not currently erase MapPoint from memory)
   bool mbBad;
   // 替换本地图点的点?
   MapPoint* mpReplaced;

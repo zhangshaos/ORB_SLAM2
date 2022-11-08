@@ -93,6 +93,15 @@ public:
      * @return std::vector<KeyFrame*> 获得的关键帧序列
      */
     std::vector<KeyFrame*> GetAllKeyFrames();
+
+    /**
+     * @brief 获取地图中mnFrameId在[curFrame-lastPeriod, curFrame)之间所有关键帧
+     * @param curFrame
+     * @param lastPeriod
+     * @return std::vector<KeyFrame*>
+     */
+    std::vector<KeyFrame*> GetLastKeyFrames(unsigned int curFrame, int lastPeriod);
+
     /**
      * @brief 获取地图中的所有地图点
      * 

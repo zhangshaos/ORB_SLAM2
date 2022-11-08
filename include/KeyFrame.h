@@ -266,29 +266,33 @@ public:
      */
     bool IsInImage(const float &x, const float &y) const;
 
-    // Enable/Disable bad flag changes
     /**
-     * @brief 设置当前关键帧不要在优化的过程中被删除
+     * @brief 设置当前关键帧不要在LocalMapping::KeyFrameCulling()的过程中被删除。
+     * 由回环检测线程使用。
+     *
      */
-    void SetNotErase();
+    void PreventEraseInKFCulling();
 
     /**
-     * @brief 准备删除当前的这个关键帧,表示不进行回环检测过程;由回环检测线程调用
+     * @brief 设置当前关键帧可以在LocalMapping::KeyFrameCulling()的过程中被删除。
+     * 由回环检测线程使用。
+     *
      */
-    void SetErase();
-
-    // Set/check bad flag
-    /**
-     * @brief 真正地执行删除关键帧的操作
-     */
-    void SetBadFlag();
+    void PermitEraseInKFCulling();
 
     /**
-     * @brief 返回当前关键帧是否已经完蛋了
+     * @brief 执行删除关键帧的操作，并设置bad标志位标记当前KF已经被删除。
+     * 由LocalMapping::KeyFrameCulling()调用。
+     *
+     */
+    void EraseAndSetBad();
+
+    /**
+     * @brief 返回当前关键帧是否已经被删除了
+     *
      */
     bool isBad();
 
-    // Compute Scene Depth (q=2 means median). Used in monocular.
     /**
      * @brief 评估当前关键帧场景深度，q=2表示中值
      * @param q q=2
@@ -440,9 +444,9 @@ protected:
     std::set<KeyFrame*> mspLoopEdges;           // 和当前关键帧形成回环关系的关键帧
 
     // Bad flags
-    bool mbNotErase;            // 当前关键帧已经和其他的关键帧形成了回环关系，因此在各种优化的过程中不应该被删除
-    bool mbToBeErased;          //
-    bool mbBad;                 //
+    bool mbPreventErase;        // 当前关键帧已经和其他的关键帧形成了回环关系，因此暂时不应该被删除
+    bool mbShouldErase;         // 表示当前帧应该被删除，但是由于设置了mbPreventErase导致删除操作延后
+    bool mbBad;                 // 只有 LocalMapping::KeyFrameCulling() 才负责真正地删除关键帧
 
     Map* mpMap;
 

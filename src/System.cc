@@ -47,7 +47,7 @@ namespace ORB_SLAM2
 //系统的构造函数，将会启动其他的线程
 System::System(const string &strVocFile,				//词典文件路径
 			         const string &strSettingsFile,   //配置文件路径
-               const bool bUseViewer):					//是否使用可视化界面
+               bool bUseViewer):					//是否使用可视化界面
          mpViewer(nullptr),		                  //
          mbReset(false),  						          //无复位标志
          mTrackingState(Tracking::State::SYSTEM_NOT_READY)
@@ -56,7 +56,7 @@ System::System(const string &strVocFile,				//词典文件路径
     cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
     if(!fsSettings.isOpened())
     {
-       LOG(ERROR) << "Failed to open settings file at: " << strSettingsFile << endl;
+       LOG(ERROR) << "Failed to open settings file at: " << strSettingsFile << '\n';
        exit(-1);
     }
 
@@ -69,7 +69,7 @@ System::System(const string &strVocFile,				//词典文件路径
     if(!bVocLoad)
     {
         LOG(ERROR) << "Wrong path to vocabulary. "
-                   << "Failed to open at: " << strVocFile << endl;
+                   << "Failed to open at: " << strVocFile << '\n';
         exit(-1);
     }
     LOG(INFO) << "Vocabulary loaded!\n";
@@ -200,7 +200,8 @@ vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
     return mTrackedKeyPointsUn;
 }
 
-bool System::SaveMap(const string &filename) {
+bool System::SaveMap(const string &filename, const Sophus::SE3d *revertTransform)
+{
   auto mapPoints = mpMap->GetAllMapPoints();
   if (mapPoints.empty())
     return false;
@@ -211,6 +212,14 @@ bool System::SaveMap(const string &filename) {
     {
       cv::Mat wPos = p->GetWorldPos();
       double x = wPos.at<float>(0), y = wPos.at<float>(1), z = wPos.at<float>(2);
+      if (revertTransform)
+      {
+        Eigen::Vector3d eigenWPos{x, y, z};
+        eigenWPos = (*revertTransform) * eigenWPos;
+        x = eigenWPos.x();
+        y = eigenWPos.y();
+        z = eigenWPos.z();
+      }
       vertexesPosition.emplace_back(std::array<double,3>{x, y, z});
     }
   plyFile.addVertexPositions(vertexesPosition);
@@ -218,14 +227,14 @@ bool System::SaveMap(const string &filename) {
   return true;
 }
 
-bool System::LoadMap(const string &filename) {
-  return false;
-}
 
-int System::TrackMonocularWithPose(const cv::Mat &im, double timestamp, const Sophus::SE3d &poseTcw)
+int System::TrackMonocularWithPose(const cv::Mat &im, double timestamp,
+                                   const Sophus::SE3d &poseTcw,
+                                   const std::string& imName)
 {
   mInPoseTcw = poseTcw;
   mInImage = im;
+  mInImageName = imName;
 
   // Check reset
   {
@@ -238,7 +247,7 @@ int System::TrackMonocularWithPose(const cv::Mat &im, double timestamp, const So
   }
 
   // 获取相机位姿的估计结果
-  auto state = mpTracker->trackImageWithPose(im, timestamp, Converter::toCvMat(poseTcw));
+  auto state = mpTracker->trackImageWithPose(im, timestamp, Converter::toCvMat(poseTcw), imName.c_str());
 
   unique_lock<mutex> lock(mMutexState);
   mTrackingState = state;
@@ -274,6 +283,8 @@ bool System::SaveTrackedMap(const std::string &filePath)
     const cv::KeyPoint& kpt = keyPoints[i];
     if (mpt && !mpt->isBad())
     {
+      // todo: 对地图点点进行筛选
+      // mpt->GetFound();
       Eigen::Vector3d wPos = Converter::toVector3d(mpt->GetWorldPos());
       Eigen::Vector3d camPos = mInPoseTcw * wPos;
       vertexesPos.emplace_back(std::array<double,3>{ camPos.x(), camPos.y(), camPos.z() });

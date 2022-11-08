@@ -2,7 +2,7 @@
 FBoWVocabularyPath = 'E:\git_repos\ORB_SLAM2\Vocabulary\ORBvoc.bin'
 
 # Path of images collection text
-ImagesCollectionPath = 'E:\git_repos\ORB_SLAM2\Examples\Monocular\shenzhen_simple\shenzhen_images.txt'
+ImagesCollectionPath = 'E:\git_repos\ORB_SLAM2\Examples\Monocular\shenzhen_images.txt'
 
 # Path of cameras pose collection text
 CameraPoseCollectionPath = 'E:\git_repos\ORB_SLAM2\Examples\Monocular\shenzhen_cameras.txt'

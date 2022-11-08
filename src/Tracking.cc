@@ -44,6 +44,7 @@
 #include "System.h"
 #include "Tracking.h"
 #include "Optimizer.h"
+#include "PnPsolver.h"
 
 
 using namespace std;
@@ -133,27 +134,26 @@ Tracking::Tracking(
   mMaxFrames = (int)fps;
 
   //输出
-  LOG(INFO) << "Camera Parameters:\n";
-  LOG(INFO) << "- fx: " << fx << endl;
-  LOG(INFO) << "- fy: " << fy << endl;
-  LOG(INFO) << "- cx: " << cx << endl;
-  LOG(INFO) << "- cy: " << cy << endl;
-  LOG(INFO) << "- k1: " << DistCoef.at<float>(0) << endl;
-  LOG(INFO) << "- k2: " << DistCoef.at<float>(1) << endl;
-  if(DistCoef.rows==5)
-    LOG(INFO) << "- k3: " << DistCoef.at<float>(4) << endl;
-  LOG(INFO) << "- p1: " << DistCoef.at<float>(2) << endl;
-  LOG(INFO) << "- p2: " << DistCoef.at<float>(3) << endl;
-  LOG(INFO) << "- fps: " << fps << endl;
+  LOG(INFO)
+  << "Camera Parameters:\n"
+  << "- fx: " << fx << '\n'
+  << "- fy: " << fy << '\n'
+  << "- cx: " << cx << '\n'
+  << "- cy: " << cy << '\n'
+  << "- k1: " << DistCoef.at<float>(0) << '\n'
+  << "- k2: " << DistCoef.at<float>(1) << '\n'
+  << "- p1: " << DistCoef.at<float>(2) << '\n'
+  << "- p2: " << DistCoef.at<float>(3) << '\n'
+  << "- fps: " << fps << '\n';
 
   // 1:RGB 0:BGR
   int nRGB = fSettings["Camera.RGB"];
   mbRGB = nRGB;
 
   if(mbRGB)
-    LOG(INFO) << "- color order: RGB (ignored if grayscale)" << endl;
+    LOG(INFO) << "- color order: RGB (ignored if grayscale)" << '\n';
   else
-    LOG(INFO) << "- color order: BGR (ignored if grayscale)" << endl;
+    LOG(INFO) << "- color order: BGR (ignored if grayscale)" << '\n';
 
   // Load ORB parameters
 
@@ -181,19 +181,21 @@ Tracking::Tracking(
   // 在单目初始化的时候，会用 mpIniORBextractor 来作为特征点提取器
   mpIniORBextractor = new ORBextractor(2*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
-  LOG(INFO) << "ORB Extractor Parameters:\n";
-  LOG(INFO) << "- Number of Features: " << nFeatures << endl;
-  LOG(INFO) << "- Scale Levels: " << nLevels << endl;
-  LOG(INFO) << "- Scale Factor: " << fScaleFactor << endl;
-  LOG(INFO) << "- Initial Fast Threshold: " << fIniThFAST << endl;
-  LOG(INFO) << "- Minimum Fast Threshold: " << fMinThFAST << endl;
+  LOG(INFO)
+  << "ORB Extractor Parameters:\n"
+  << "- Number of Features: " << nFeatures << '\n'
+  << "- Scale Levels: " << nLevels << '\n'
+  << "- Scale Factor: " << fScaleFactor << '\n'
+  << "- Initial Fast Threshold: " << fIniThFAST << '\n'
+  << "- Minimum Fast Threshold: " << fMinThFAST << '\n';
 }
 
 
 Tracking::State
 Tracking::trackImageWithPose(const cv::Mat &im,
                              double timestamp,
-                             const cv::Mat &poseTcw)
+                             const cv::Mat &poseTcw,
+                             const char* imName)
 {
   mImGray = im;
 
@@ -274,9 +276,18 @@ Tracking::trackImageWithPose(const cv::Mat &im,
         if (!bOK)
           // Step 2.3 追踪
           bOK = TrackWithReferenceKF();
-      } else {
-        // 丢失追踪了
-        LOG(INFO) << "Lost tracking with Frame " << mCurrentFrame.mnId;
+        if (!bOK)
+          // 丢失追踪了
+          LOG(INFO) << "Lost tracking with Frame " << mCurrentFrame.mnId << "...\n"
+                    << "Its image file name is " << (imName ? imName : "unknown");
+      } else
+      {
+        // todo: 当追踪失败后，就地初始化一个新地图，保存旧地图数据
+        bOK = Relocalization();
+        if (bOK)
+          LOG(INFO) << "Relocating is successful!";
+        else
+          LOG(INFO) << "Relocating is failed for Frame " << mCurrentFrame.mnId << '!';
       }
 
       mCurrentFrame.mpReferenceKF = mpReferenceKF;
@@ -319,7 +330,7 @@ Tracking::trackImageWithPose(const cv::Mat &im,
       // Step 10 如果初始化后不久就跟踪失败，并且relocation也没有搞定，只能重新Reset
       if(mState==LOST && mpMap->KeyFramesInMap() <= 5)
       {
-        LOG(INFO) << "Track lost soon after initialisation, reseting..." << endl;
+        LOG(INFO) << "Track lost soon after initialisation, reseting..." << '\n';
         mpSystem->Reset();
         break;
       }
@@ -413,13 +424,13 @@ void Tracking::Initialization()
       mvInitialMatches,               //保存参考帧F1中特征点是否匹配上，index保存是F1对应特征点索引，值保存的是匹配好的F2特征点索引
       100);                           //搜索窗口大小
 
-
-    // todo: 删除这里
-    LOG(INFO) << "nMatch = " << nMatch << '\n';
-
     // Step 4 验证匹配结果，如果初始化的两帧之间的匹配点太少，重新初始化
     if(nMatch < 100)
     {
+      LOG(INFO)
+      << "Try initialize with Frame " << mCurrentFrame.mnId
+      << " with Frame " << mInitialFrame.mnId
+      << "...\nBut keypoint matches: " << nMatch;
       delete mpInitializer;
       mpInitializer = nullptr;
       return;
@@ -511,7 +522,7 @@ void Tracking::CreateInitialMap(const std::vector<cv::Point3f>& vIniP3D)
   pKFcur->UpdateConnections();
 
   // Bundle Adjustment
-  LOG(INFO) << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
+  LOG(INFO) << "Create initial Map with " << mpMap->MapPointsInMap() << " points." << '\n';
 
   // Step 4 全局BA优化，同时优化所有三维点
   Optimizer::GlobalBundleAdjustemnt(mpMap, 20, nullptr, 0, true, {pKFini->mnId, pKFcur->mnId});
@@ -605,7 +616,7 @@ bool Tracking::TrackLocalMap()
 
   // Step 2：筛选局部地图中新增的在视野范围内的地图点，投影到当前帧搜索匹配，得到更多的匹配关系
   int nNewMatches = ProjectLocalPointsToCurrentFrame();
-  LOG(INFO) << "New matched map points in TrackLocalMap(): " << nNewMatches;
+  //LOG(INFO) << "New matched map points in TrackLocalMap(): " << nNewMatches;
 
   // Optimize Pose
   // Step 3：前面新增了更多的匹配关系，BA优化得到更准确的位姿
@@ -626,7 +637,9 @@ bool Tracking::TrackLocalMap()
         mnMatchesInliers++;
     }
   }
-  LOG(INFO) << "Frame " << mCurrentFrame.mnId << " matches: " << mnMatchesInliers;
+  LOG(INFO)
+  << "Frame " << mCurrentFrame.mnId
+  << " total Map point matches: " << mnMatchesInliers;
 
   // Decide if the tracking was succesful
   // More restrictive if there was a relocalization recently
@@ -997,22 +1010,22 @@ void Tracking::Reset()
     while(!mpViewer->isStopped())
       std::this_thread::sleep_for(std::chrono::milliseconds(3));
   }
-  LOG(INFO) << "System Reseting" << endl;
+  LOG(INFO) << "System Reseting" << '\n';
 
   // Reset Local Mapping
   LOG(INFO) << "Reseting Local Mapper...";
   mpLocalMapper->RequestReset();
-  LOG(INFO) << " done" << endl;
+  LOG(INFO) << " done" << '\n';
 
   // Reset Loop Closing
   LOG(INFO) << "Reseting Loop Closing...";
   mpLoopClosing->RequestReset();
-  LOG(INFO) << " done" << endl;
+  LOG(INFO) << " done" << '\n';
 
   // Clear BoW Database
   LOG(INFO) << "Reseting Database...";
   mpKeyFrameDB->clear();
-  LOG(INFO) << " done" << endl;
+  LOG(INFO) << " done" << '\n';
 
   // Clear Map (this erase MapPoints and KeyFrames)
   mpMap->clear();
@@ -1081,11 +1094,12 @@ bool Tracking::TrackWithReferenceKF()
  * 将当前帧已匹配的地图点重投影到图片上，计算误差error，
  * 并将error^2 > th2的地图点取消与特征点的匹配。
  *
- * 由 TrackWithInitialPose()、TrackWithReferenceKF() 调用
+ * 由 TrackWithInitialPose()、TrackWithReferenceKF()、Relocalization() 调用
  *
- * @return 错误匹配(error^2 > th2)的数量
+ * @return 错误匹配(error^2 > th2)的数量 if returnGood==false
+ * @return 正确匹配的数量 if returnGood==true
  */
-int Tracking::CheckMatchesByProjection(float th2)
+int Tracking::CheckMatchesByProjection(float th2, bool returnGood)
 {
   // 构建投影矩阵
   cv::Mat Tcw = mCurrentFrame.getPose();
@@ -1094,7 +1108,7 @@ int Tracking::CheckMatchesByProjection(float th2)
   Tcw.rowRange(0, 3).colRange(0, 4).copyTo(P);
   P = K * P;
   //LOG(INFO) << "Proj Matrix of current frame is:\n" << P;
-  int nBad = 0;
+  int nBad = 0, nGood = 0;
   for (int i=0; i<mCurrentFrame.N; ++i)
   {
     const cv::KeyPoint& kp = mCurrentFrame.getKeyPoints()[i];
@@ -1114,10 +1128,128 @@ int Tracking::CheckMatchesByProjection(float th2)
         if (z > 0)
           mp->mnLastFrameSeen = mCurrentFrame.mnId;
         ++nBad;
-      }
+      } else
+        ++nGood;
     }
   }
-  return nBad;
+  return returnGood ? nGood : nBad;
+}
+
+
+/**
+ * 在关键帧数据库中搜索关键帧进行KF地图点-当前帧特征匹配
+ *
+ * @return is a successful re-localization.
+ */
+bool Tracking::Relocalization()
+{
+  // Compute Bag of Words Vector
+  mCurrentFrame.ComputeBoW();
+
+  // Relocalization is performed when tracking is lost
+  // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
+  std::vector<KeyFrame*> vpCandidateKFs = mpKeyFrameDB->DetectRelocalizationCandidates(&mCurrentFrame);
+  // 经过测试，上面这个经常只找到一个关键帧，因此添加一些最近的关键帧
+  std::vector<KeyFrame*> candiKFs2 = mpMap->GetLastKeyFrames(mCurrentFrame.mnId, mMaxFrames);
+  for (KeyFrame* KF : candiKFs2)
+    vpCandidateKFs.emplace_back(KF);
+  const int nKFs = vpCandidateKFs.size();
+  if(nKFs <= 0)
+  {
+    LOG(INFO) << "Relocalization: Can not found similar KF for Frame " << mCurrentFrame.mnId;
+    return false;
+  }
+
+  // 对某个候选项（关键帧）做ORB的地图点-当前帧特征点匹配
+  ORBmatcher matcher(0.75, true);
+  std::vector<std::vector<MapPoint*>> vvpMapPointMatches(nKFs); // 匹配上的地图点
+  std::vector<bool> vbDiscarded(nKFs,false); // 标记那些当前帧没追踪上的关键帧
+  int nCandi = 0;
+  for(int i=0; i<nKFs; i++)
+  {
+    KeyFrame* pKF = vpCandidateKFs[i];
+    if(pKF->isBad())
+      vbDiscarded[i] = true;
+    else
+    {
+      int nmatches = matcher.SearchByBoW(pKF,mCurrentFrame,vvpMapPointMatches[i]);
+      if(nmatches<15)
+        vbDiscarded[i] = true;
+      else
+        ++nCandi;
+    }
+  }
+  LOG(INFO)
+  << "Relocalization: Found " << nCandi
+  << " candidates in " << nKFs << " similar KFs"
+  << " for Frame " << mCurrentFrame.mnId
+  << "\nGlobal Map contains " << mpMap->KeyFramesInMap() << " KFs.";
+
+  // 通过重投影误差过滤掉不好的匹配
+  bool bFoundOne = false; // 找到一个最好的匹配候选项
+  ORBmatcher matcher2(0.9, true);
+  for(int i=0; i<nKFs; i++)
+  {
+    if(vbDiscarded[i])
+      continue;
+
+    // 计算当前帧地图点反投影误差，过滤不好的匹配
+    std::set<MapPoint*> sFoundMapPoints;
+    for(int j=0, jend=mCurrentFrame.N; j<jend; j++)
+    {
+      MapPoint *matchedMP = vvpMapPointMatches[i][j];
+      if(matchedMP)
+      {
+        mCurrentFrame.mvpMapPoints[j]=matchedMP;
+        sFoundMapPoints.insert(matchedMP);
+      }
+      else
+        mCurrentFrame.mvpMapPoints[j]=nullptr;
+    }
+    int nGood = CheckMatchesByProjection(5.991, true);
+    // 如果好匹配太少了，则试试：
+    // 增大ORB匹配阈值，然后再反投影误差筛选
+    if(nGood<50)
+    {
+      int nAdditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFoundMapPoints, 10, 100);
+      if(nAdditional + nGood >= 50)
+      {
+        nGood = CheckMatchesByProjection(5.991, true);
+        // 如果好匹配还是不够，则缩小匹配阈值，再试试
+        if(nGood>30 && nGood<50)
+        {
+          sFoundMapPoints.clear();
+          for(int j =0, jend=mCurrentFrame.N; j < jend; j++)
+          {
+            MapPoint *p;
+            if ((p = mCurrentFrame.mvpMapPoints[j]))
+              sFoundMapPoints.insert(p);
+          }
+          nAdditional = matcher2.SearchByProjection(mCurrentFrame, vpCandidateKFs[i], sFoundMapPoints, 3, 64);
+          // 最后的核验重投影误差
+          if(nGood + nAdditional >= 50)
+            nGood = CheckMatchesByProjection(5.991, true);
+        }
+      }
+    }
+
+    // 如果找到了足够的匹配
+    if(nGood>=50)
+    {
+      bFoundOne = true;
+      break;
+    } else
+      LOG(INFO) << "Relocalization: Found " << nGood
+      << " good matches w.r.t candidate KF " << vpCandidateKFs[i]->mnId;
+  }
+
+  if(bFoundOne)
+  {
+    mnLastRelocFrameId = mCurrentFrame.mnId;
+    return true;
+  }
+  else
+    return false;
 }
 
 

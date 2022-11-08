@@ -89,11 +89,13 @@ public:
      * @param[in] im            图像
      * @param[in] timestamp     时间戳
      * @param[in] poseTcw       当前位置和朝向
+     * @param[in] imName        图像文件名
      * @return Tracking::State  追踪状态
      */
      Tracking::State trackImageWithPose(const cv::Mat &im,
                                         double timestamp,
-                                        const cv::Mat &poseTcw);
+                                        const cv::Mat &poseTcw,
+                                        const char* imName=nullptr);
 
     /**
      * @brief 设置局部地图句柄
@@ -167,11 +169,12 @@ protected:
      * 将当前帧已匹配的地图点重投影到图片上，计算误差error，
      * 并将error^2 > th2的地图点取消与特征点的匹配。
      *
-     * 由 TrackWithInitialPose()、TrackWithReferenceKF() 调用
+     * 由 TrackWithInitialPose()、TrackWithReferenceKF()、Relocalization() 调用
      *
-     * @return 错误匹配(error^2 > th2)的数量
+     * @return 错误匹配(error^2 > th2)的数量 if returnGood==false
+     * @return 正确匹配的数量 if returnGood==true
      */
-    int CheckMatchesByProjection(float th2);
+    int CheckMatchesByProjection(float th2=5.991, bool returnGood=false);
 
     /**
      * 尝试使用当前帧初始化的位姿来进行当前帧特征-过去帧地图点匹配
@@ -186,6 +189,14 @@ protected:
      * @return is a successful tracking.
      */
     bool TrackWithReferenceKF();
+
+
+    /**
+     * 在关键帧数据库中搜索关键帧进行KF地图点-当前帧特征匹配
+     *
+     * @return is a successful re-localization.
+     */
+    bool Relocalization();
 
     
     /**

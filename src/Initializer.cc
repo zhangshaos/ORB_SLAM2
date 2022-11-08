@@ -142,7 +142,14 @@ bool Initializer::initializeMapPoints(const Frame &ReferFrame,
 
   const float minParallax = 1.0; // 视差角度 1°
   const int minTriangulated = 50;
-  return parallax > minParallax && nGood >= minTriangulated;
+  bool ok = parallax > minParallax && nGood >= minTriangulated;
+  if (!ok)
+    LOG(INFO)
+    << "Try Initializer::initializeMapPoints() failed!\n"
+    << "Frame cur: " << CurrentFrame.mnId << " Frame ref: " << ReferFrame.mnId
+    << "\nparallax: " << parallax << " nGood: " << nGood
+    << "\n(We recommend to only translate (no rotation) for initializing)";
+  return ok;
 }
 
 
@@ -175,30 +182,31 @@ int Initializer::triangulatePoints(const cv::Mat &poseTcw1,
   vP3D.resize(N);
   vbGood.resize(N, false);
 
-  LOG(INFO) << "Camera Intrincs matrix:\n" << K;
+  //LOG(INFO) << "Camera Intrincs matrix:\n" << K;
 
   // Step 1：计算相机的投影矩阵
   cv::Mat P1(3, 4, CV_32F);
   poseTcw1.rowRange(0,3).colRange(0,4).copyTo(P1);
-  LOG(INFO) << "poseTcw1:\n" << P1;
+  //LOG(INFO) << "poseTcw1:\n" << P1;
   P1 = K * P1;
   cv::Mat R1 = poseTcw1.rowRange(0,3).colRange(0,3);
   cv::Mat t1 = poseTcw1.col(3).rowRange(0,3);
   cv::Mat O1 = -(R1.t() * t1); // 光心设置为世界坐标系下的原点
-  LOG(INFO) << "O1:\n" << O1;
+  //LOG(INFO) << "O1:\n" << O1;
 
   cv::Mat P2(3, 4, CV_32F);
   poseTcw2.rowRange(0,3).colRange(0,4).copyTo(P2);
-  LOG(INFO) << "PoseTcw2:\n" << P2;
+  //LOG(INFO) << "PoseTcw2:\n" << P2;
   P2 = K * P2;
   cv::Mat R2 = poseTcw2.rowRange(0,3).colRange(0,3);
   cv::Mat t2 = poseTcw2.col(3).rowRange(0,3);
   cv::Mat O2 = -(R2.t() * t2);
-  LOG(INFO) << "O2:\n" << O2;
+  //LOG(INFO) << "O2:\n" << O2;
 
   std::vector<float> vCosParallax; // 存储计算出来的每对特征点的视差
   vCosParallax.reserve(N);
   int nGood = 0;
+  int nBadInfinite=0, nBadDepth=0, nBadParallax=0, nBadProject=0;
   for(const auto & match12 : vMatches12)
   {
     // Step 2 获取特征点对，调用Triangulate() 函数进行三角化，得到三角化测量之后的3D点坐标
@@ -215,6 +223,7 @@ int Initializer::triangulatePoints(const cv::Mat &poseTcw1,
     if(!isfinite(p3d.at<float>(0)) || !isfinite(p3d.at<float>(1)) || !isfinite(p3d.at<float>(2)))
     {
       vbGood[match12.first]=false;
+      ++nBadInfinite;
       continue;
     }
 
@@ -229,10 +238,18 @@ int Initializer::triangulatePoints(const cv::Mat &poseTcw1,
     //LOG(INFO) << "Camera p1:\n" << zuv1 << '\n'
     //          << "Camera p2:\n" << zuv2 << '\n'
     //          << "CosParallax: " << cosParallax;
-    if(cosParallax >= 0.99998 || zuv1.at<float>(2) <= 0 || zuv2.at<float>(2) <= 0)
+    if (cosParallax >= 0.99998)
+    {
+      ++nBadParallax;
+      continue;
+    }
+    if(zuv1.at<float>(2) <= 0 || zuv2.at<float>(2) <= 0)
+    {
       // 如果视差较小（cos值大），或者深度值为负值，则排除
       // 这里0.99998 对应的角度为0.36°
+      ++nBadDepth;
       continue;
+    }
 
     // Step 5 第三关：计算空间点在参考帧和当前帧上的重投影误差，如果大于阈值则舍弃
     cv::Mat ptHomo1 = zuv1 / zuv1.at<float>(2); // (u,v,1)
@@ -243,7 +260,10 @@ int Initializer::triangulatePoints(const cv::Mat &poseTcw1,
     //          << "Original point: (" << kp1.pt.y << ", " << kp1.pt.x << ")\n"
     //          << "Projection Error 1 ^2: " << squareError1 << '\n';
     if(squareError1 > th2)
+    {
+      ++nBadProject;
       continue;
+    }
 
     cv::Mat ptHomo2 = zuv2 / zuv2.at<float>(2);
     float im2x = ptHomo2.at<float>(0);
@@ -253,7 +273,10 @@ int Initializer::triangulatePoints(const cv::Mat &poseTcw1,
     //          << "Original point: (" << kp2.pt.y << ", " << kp2.pt.x << ")\n"
     //          << "Projection Error 2 ^2: " << squareError2 << '\n';
     if(squareError2 > th2)
+    {
+      ++nBadProject;
       continue;
+    }
 
     // Step 6 统计经过检验的3D点个数，记录3D点视差角
     vP3D[match12.first] = cv::Point3f(p3d.at<float>(0), p3d.at<float>(1), p3d.at<float>(2));
@@ -278,6 +301,27 @@ int Initializer::triangulatePoints(const cv::Mat &poseTcw1,
   }
   else
     parallax = 0;
+
+  LOG(INFO)
+  << "Try Initializer::initializeMapPoints()...\n"
+  << "nGood: " << nGood
+  << ", nBadInfinite: " << nBadInfinite
+  << ", nBadParallax: " << nBadParallax
+  << ", nBadDepth: " << nBadDepth
+  << ", nBadProject: " << nBadProject;
+
+  // 从实验测试上看，当初始化含有旋转时，匹配数量和正确匹配占比都减小了。
+  // 无旋转：
+  // nGood: 122, nBadInfinite: 0, nBadParallax: 5, nBadDepth: 16, nBadProject: 37
+  // （180个匹配，好匹配占比为0.68）
+  // 有旋转：
+  // nGood: 52, nBadInfinite: 0, nBadParallax: 23, nBadDepth: 34, nBadProject: 30
+  // （139个匹配，好匹配占比0.37）
+  // nGood: 58, nBadInfinite: 0, nBadParallax: 25, nBadDepth: 29, nBadProject: 23
+  // （135个匹配，好匹配占比0.43）
+  // nGood: 30, nBadInfinite: 0, nBadParallax: 5, nBadDepth: 18, nBadProject: 48
+  // （101个匹配，好匹配占比0.30）
+  // 从数据上看，初始化的旋转导致视角太小，深度为负，这些应该是错误的特征点匹配导致的。
   return nGood;
 }
 

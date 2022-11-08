@@ -171,4 +171,16 @@ void Map::clear()
   mvpKeyFrameOrigins.clear();
 }
 
+
+std::vector<KeyFrame *> Map::GetLastKeyFrames(unsigned int curFrame, int lastPeriod)
+{
+  unique_lock<mutex> lock(mMutexMap);
+  std::vector<KeyFrame *> KFs;
+  for (KeyFrame* KF : mspKeyFrames)
+    if (KF && (curFrame - KF->mnFrameId) <= lastPeriod)
+      KFs.emplace_back(KF);
+  return KFs;
+}
+
+
 } //namespace ORB_SLAM

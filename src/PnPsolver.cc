@@ -1419,7 +1419,7 @@ void PnPsolver::qr_solve(CvMat * A, CvMat * b, CvMat * X)
     if (eta == 0)
     {
       A1[k] = A2[k] = 0.0;
-      LOG(ERROR) << "God damnit, A is singular, this shouldn't happen." << endl;
+      LOG(ERROR) << "God damnit, A is singular, this shouldn't happen." << '\n';
       return;
     }
     else
