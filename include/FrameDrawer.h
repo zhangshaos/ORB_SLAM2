@@ -32,10 +32,27 @@
 namespace ORB_SLAM2
 {
 
+
+/**
+ * 直接对图片进行放缩，往往会导致摩尔纹，该函数内部进行多次放缩，以减小摩尔纹效应。
+ * @param[in] im            cv::Mat 输入图片
+ * @param[in] h             目标图片高度
+ * @param[in] w             目标图片宽度
+ * @param[in] scaleTimes    放缩次数，默认为3
+ * @return cv::Mat 返回目标图片
+ */
+cv::Mat ResizeWithoutMoirePattern(const cv::Mat& im, int h, int w, int scaleTimes=3);
+
+
 class Tracking;
 class Viewer;
 class Map;
 
+
+/**
+ * @brief 绘制每一帧图片、追踪的特征点等
+ *
+ */
 class FrameDrawer
 {
 public:
@@ -74,26 +91,25 @@ protected:
    */
   void DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText);
 
-  // Info of the frame to be drawn
-  ///当前绘制的图像
+  //当前绘制的图像
   cv::Mat mIm;
-  ///当前帧中特征点的数目
+  //当前帧中特征点的数目
   int N;
-  ///当前帧中的特征点
+  //当前帧中的特征点
   std::vector<cv::KeyPoint> mvCurrentKeys;
-  ///当前帧中的特征点是否在地图中的标记
-  ///当前帧的特征点在地图中是否出现;后者是表示地图中没有出现,但是在当前帧中是第一次被观测得到的点
-  std::vector<bool> mvbMap, mvbVO;
-  ///当前帧中追踪到的特征点计数
+  //当前帧中特征点对应的地图点是否在地图中的标记
+  //当前帧的特征点在地图中是否出现;后者是表示地图中没有出现,但是在当前帧中是第一次被观测得到的点
+  std::vector<bool> mvbKeyPtInMap, mvbVO;
+  //当前帧中追踪到的特征点计数
   int mnTracked, mnTrackedVO;
-  ///参考帧中的特征点
+  //参考帧中的特征点
   std::vector<cv::KeyPoint> mvIniKeys;
-  ///当前帧特征点和参考帧特征点的匹配关系
+  //当前帧特征点和参考帧特征点的匹配关系
   std::vector<int> mvIniMatches;
-  ///当前SLAM系统的工作状态
+  //当前SLAM系统的工作状态
   int mState;
 
-  ///地图指针
+  //地图指针
   Map* mpMap;
 
   //线程锁

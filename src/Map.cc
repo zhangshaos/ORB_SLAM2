@@ -71,6 +71,7 @@ void Map::EraseMapPoint(MapPoint *pMP)
   // 占用的内存区域并没有得到释放
   // TODO: This only erase the pointer.
   // Delete the MapPoint
+  // delete pMP;
 }
 
 /**
@@ -85,17 +86,18 @@ void Map::EraseKeyFrame(KeyFrame *pKF)
 
   // TODO: This only erase the pointer.
   // Delete the MapPoint
+  // delete pKF;
 }
 
 /*
- * @brief 设置参考MapPoints，将用于DrawMapPoints函数画图
+ * @brief 设置参考地图点用于绘图显示局部地图点（红色），将用于DrawMapPoints函数画图
  * @param vpMPs Local MapPoints
+ *
  */
-// 设置参考地图点用于绘图显示局部地图点（红色）
-void Map::SetReferenceMapPoints(const vector<MapPoint *> &vpMPs)
+void Map::SetLocalMapPoints(const vector<MapPoint *> &vpMPs)
 {
   unique_lock<mutex> lock(mMutexMap);
-  mvpReferenceMapPoints = vpMPs;
+  mvpLocalMapPoints = vpMPs;
 }
 
 //REVIEW 这个好像没有用到
@@ -117,14 +119,14 @@ int Map::GetLastBigChangeIdx()
 vector<KeyFrame*> Map::GetAllKeyFrames()
 {
   unique_lock<mutex> lock(mMutexMap);
-  return std::vector<KeyFrame*>(mspKeyFrames.begin(),mspKeyFrames.end());
+  return {mspKeyFrames.begin(),mspKeyFrames.end()};
 }
 
 //获取地图中的所有地图点
 vector<MapPoint*> Map::GetAllMapPoints()
 {
   unique_lock<mutex> lock(mMutexMap);
-  return std::vector<MapPoint*>(mspMapPoints.begin(),mspMapPoints.end());
+  return {mspMapPoints.begin(),mspMapPoints.end()};
 }
 
 //获取地图点数目
@@ -142,10 +144,10 @@ long unsigned int Map::KeyFramesInMap()
 }
 
 //获取参考地图点
-vector<MapPoint*> Map::GetReferenceMapPoints()
+vector<MapPoint*> Map::GetLocalMapPoints()
 {
   unique_lock<mutex> lock(mMutexMap);
-  return mvpReferenceMapPoints;
+  return mvpLocalMapPoints;
 }
 
 //获取地图中最大的关键帧id
@@ -167,7 +169,7 @@ void Map::clear()
   mspMapPoints.clear();
   mspKeyFrames.clear();
   mnMaxKFid = 0;
-  mvpReferenceMapPoints.clear();
+  mvpLocalMapPoints.clear();
   mvpKeyFrameOrigins.clear();
 }
 

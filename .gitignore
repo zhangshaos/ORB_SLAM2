@@ -7,6 +7,10 @@ Vocabulary/**
 !Vocabulary/ORBvoc.bin
 Out/
 data/
+Examples/*.png
+Examples/*.jpg
+Examples/**/*.png
+Examples/**/*.jpg
 
 .vscode/
 .vs/

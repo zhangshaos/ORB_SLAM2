@@ -33,37 +33,43 @@
 #include "Frame.h"
 
 
-namespace ORB_SLAM2
-{
+namespace ORB_SLAM2 {
 
-class ORBextractor;
-class Viewer;
-class FrameDrawer;
-class MapDrawer;
-class Map;
-class Initializer;
-class LocalMapping;
-class LoopClosing;
-class KeyFrameDatabase;
-class System;
+  class ORBextractor;
+
+  class Viewer;
+
+  class FrameDrawer;
+
+  class MapDrawer;
+
+  class Map;
+
+  class Initializer;
+
+  class LocalMapping;
+
+  class LoopClosing;
+
+  class KeyFrameDatabase;
+
+  class System;
 
 /**
  * @brief  追踪当前帧功能
  * 
  */
-class Tracking
-{
-public:
-    enum State
-    {
+  class Tracking {
+  public:
+    enum State {
       SYSTEM_NOT_READY = -1, //系统没有准备好的状态,一般就是在启动后加载配置文件和词典文件时候的状态
-      NO_IMAGES_YET    = 0,  //当前无图像
-      NOT_INITIALIZED  = 1,  //有图像但是没有完成初始化
-      OK               = 2,  //正常时候的工作状态
-      LOST             = 3   //系统已经跟丢了的状态
+      NO_IMAGES_YET = 0,  //当前无图像
+      NOT_INITIALIZED = 1,  //有图像但是没有完成初始化
+      OK = 2,  //正常时候的工作状态
+      LOST = 3   //系统已经跟丢了的状态
     };
 
-public:
+  public:
     /**
      * @brief 构造函数
      * 
@@ -75,12 +81,12 @@ public:
      * @param[in] pKFDB             关键帧数据库句柄
      * @param[in] strSettingPath    配置文件路径
      */
-    Tracking(System* pSys,
-             ORBVocabulary* pVoc,
-             FrameDrawer* pFrameDrawer,
-             MapDrawer* pMapDrawer,
-             Map* pMap,
-             KeyFrameDatabase* pKFDB,
+    Tracking(System *pSys,
+             ORBVocabulary *pVoc,
+             FrameDrawer *pFrameDrawer,
+             MapDrawer *pMapDrawer,
+             Map *pMap,
+             KeyFrameDatabase *pKFDB,
              const std::string &strSettingPath);
 
     /**
@@ -92,38 +98,38 @@ public:
      * @param[in] imName        图像文件名
      * @return Tracking::State  追踪状态
      */
-     Tracking::State trackImageWithPose(const cv::Mat &im,
-                                        double timestamp,
-                                        const cv::Mat &poseTcw,
-                                        const char* imName=nullptr);
+    Tracking::State trackImageWithPose(const cv::Mat &im,
+                                       double timestamp,
+                                       const cv::Mat &poseTcw,
+                                       const char *imName = nullptr);
 
     /**
      * @brief 设置局部地图句柄
      * 
      * @param[in] pLocalMapper 局部建图器
      */
-    void SetLocalMapper(LocalMapping* pLocalMapper);
+    void SetLocalMapper(LocalMapping *pLocalMapper);
 
     /**
      * @brief 设置回环检测器句柄
      * 
      * @param[in] pLoopClosing 回环检测器
      */
-    void SetLoopClosing(LoopClosing* pLoopClosing);
+    void SetLoopClosing(LoopClosing *pLoopClosing);
 
     /**
      * @brief 设置可视化查看器句柄
      * 
      * @param[in] pViewer 可视化查看器
      */
-    void SetViewer(Viewer* pViewer);
+    void SetViewer(Viewer *pViewer);
 
     /**
      * @brief 整个系统进行复位操作
      */
     void Reset();
 
-public:
+  public:
     // 跟踪状态
     State mState;
     State mLastProcessedState; // 上一帧的跟踪状态. 这个变量在绘制当前帧的时候会被使用到
@@ -135,25 +141,25 @@ public:
     // Initialization Variables (Monocular)
     Frame mInitialFrame; // 初始化过程中的参考帧
     std::vector<int> mvInitialMatches; // 初始化阶段中,当前帧中的特征点和参考帧中的特征点的匹配关系
-protected:
-   /**
-    * @brief 单目的地图初始化
-    *
-    * 并行地计算基础矩阵和单应性矩阵，选取其中一个模型，恢复出最开始两帧之间的相对姿态以及点云
-    * 得到初始两帧的匹配、相对运动、初始MapPoints
-    *
-    * Step 1：（未创建）得到用于初始化的第一帧，初始化需要两帧
-    * Step 2：（已创建）如果当前帧特征点数大于100，则得到用于单目初始化的第二帧
-    * Step 3：在mInitialFrame与mCurrentFrame中找匹配的特征点对
-    * Step 4：如果初始化的两帧之间的匹配点太少，重新初始化
-    * Step 5：通过H模型或F模型进行单目初始化，得到两帧间相对运动、初始MapPoints
-    * Step 6：删除那些无法进行三角化的匹配点
-    * Step 7：将三角化得到的3D点包装成MapPoints
-    */
+  protected:
+    /**
+     * @brief 单目的地图初始化
+     *
+     * 并行地计算基础矩阵和单应性矩阵，选取其中一个模型，恢复出最开始两帧之间的相对姿态以及点云
+     * 得到初始两帧的匹配、相对运动、初始MapPoints
+     *
+     * Step 1：（未创建）得到用于初始化的第一帧，初始化需要两帧
+     * Step 2：（已创建）如果当前帧特征点数大于100，则得到用于单目初始化的第二帧
+     * Step 3：在mInitialFrame与mCurrentFrame中找匹配的特征点对
+     * Step 4：如果初始化的两帧之间的匹配点太少，重新初始化
+     * Step 5：通过H模型或F模型进行单目初始化，得到两帧间相对运动、初始MapPoints
+     * Step 6：删除那些无法进行三角化的匹配点
+     * Step 7：将三角化得到的3D点包装成MapPoints
+     */
     void Initialization();
-   
+
     // 生成初始地图，由 Initialization() 调用
-    void CreateInitialMap(const std::vector<cv::Point3f>& vIniP3D);
+    void CreateInitialMap(const std::vector<cv::Point3f> &vIniP3D);
 
     /**
      * @brief 检查上一帧中的MapPoints是否被替换
@@ -174,7 +180,7 @@ protected:
      * @return 错误匹配(error^2 > th2)的数量 if returnGood==false
      * @return 正确匹配的数量 if returnGood==true
      */
-    int CheckMatchesByProjection(float th2=5.991, bool returnGood=false);
+    int CheckMatchesByProjection(float th2 = 5.991, bool returnGood = false);
 
     /**
      * 尝试使用当前帧初始化的位姿来进行当前帧特征-过去帧地图点匹配
@@ -198,7 +204,7 @@ protected:
      */
     bool Relocalization();
 
-    
+
     /**
      * @brief 更新局部地图点（来自局部关键帧）
      * 这里的地图点不止当前帧可以看见的地图点
@@ -207,17 +213,17 @@ protected:
      */
     void UpdateLocalMapPoints();
 
-   /**
-     * @brief 更新局部关键帧
-     * 方法是遍历当前帧的MapPoints，将观测到这些MapPoints的关键帧和相邻的关键帧及其父子关键帧，作为mvpLocalKeyFrames
-     * Step 1：遍历当前帧的MapPoints，记录所有能观测到当前帧MapPoints的关键帧 
-     * Step 2：更新局部关键帧（mvpLocalKeyFrames），添加局部关键帧有三个策略
-     * Step 2.1 策略1：能观测到当前帧MapPoints的关键帧作为局部关键帧 （将邻居拉拢入伙）
-     * Step 2.2 策略2：遍历策略1得到的局部关键帧里共视程度很高的关键帧，将他们的家人和邻居作为局部关键帧
-     * Step 3：更新当前帧的参考关键帧，与自己共视程度最高的关键帧作为参考关键帧
-     *
-     * 由 TrackLocalMap() 调用
-     */
+    /**
+      * @brief 更新局部关键帧
+      * 方法是遍历当前帧的MapPoints，将观测到这些MapPoints的关键帧和相邻的关键帧及其父子关键帧，作为mvpLocalKeyFrames
+      * Step 1：遍历当前帧的MapPoints，记录所有能观测到当前帧MapPoints的关键帧
+      * Step 2：更新局部关键帧（mvpLocalKeyFrames），添加局部关键帧有三个策略
+      * Step 2.1 策略1：能观测到当前帧MapPoints的关键帧作为局部关键帧 （将邻居拉拢入伙）
+      * Step 2.2 策略2：遍历策略1得到的局部关键帧里共视程度很高的关键帧，将他们的家人和邻居作为局部关键帧
+      * Step 3：更新当前帧的参考关键帧，与自己共视程度最高的关键帧作为参考关键帧
+      *
+      * 由 TrackLocalMap() 调用
+      */
     void UpdateLocalKeyFrames();
 
     /**
@@ -269,37 +275,41 @@ protected:
     // mpIniORBextractor 属性中提取的特征点个数是 mpORBextractorLeft 的两倍
 
     // 作者自己编写和改良的ORB特征点提取器
-    ORBextractor* mpORBextractorLeft;
+    ORBextractor *mpORBextractorLeft;
     // 在初始化的时候使用的特征点提取器,其提取到的特征点个数会更多
-    ORBextractor* mpIniORBextractor;
+    ORBextractor *mpIniORBextractor;
 
     // BoW 词袋模型相关
-    ORBVocabulary* mpORBVocabulary;
-    KeyFrameDatabase* mpKeyFrameDB;
+    ORBVocabulary *mpORBVocabulary;
+    KeyFrameDatabase *mpKeyFrameDB;
 
     // Initalization (only for monocular)
-    Initializer* mpInitializer;
+    Initializer *mpInitializer;
 
-    // Local Map 局部地图相关=
-    KeyFrame* mpReferenceKF;// 当前关键帧就是参考帧
+    // Local Map 局部地图相关
+    KeyFrame *mpReferenceKF;// 当前关键帧就是参考帧
     // 局部关键帧集合
-    std::vector<KeyFrame*> mvpLocalKeyFrames;
+    // （具体而言，就是看到了通过TrackWithInitialPose()和TrackWithReferenceKF()
+    // 匹配上的地图点的关键帧）
+    std::vector<KeyFrame *> mvpLocalKeyFrames;
     // 局部地图点的集合
-    std::vector<MapPoint*> mvpLocalMapPoints;
+    // （具体而言，就是mvpLocalKeyFrames看到的那些那些地图点。
+    // 这些地图点不一定都被当前帧看到）
+    std::vector<MapPoint *> mvpLocalMapPoints;
 
     // Other Thread Pointers
-    LocalMapping* mpLocalMapper;
-    LoopClosing* mpLoopClosing;
+    LocalMapping *mpLocalMapper;
+    LoopClosing *mpLoopClosing;
     // System
-    System* mpSystem;
+    System *mpSystem;
     // Drawers  可视化查看器相关
-    Viewer* mpViewer;
+    Viewer *mpViewer;
     // 帧绘制器句柄
-    FrameDrawer* mpFrameDrawer;
+    FrameDrawer *mpFrameDrawer;
     // 地图绘制器句柄
-    MapDrawer* mpMapDrawer;
+    MapDrawer *mpMapDrawer;
     // (全局)地图句柄
-    Map* mpMap;
+    Map *mpMap;
 
     // Calibration matrix  相机的参数矩阵相关
     cv::Mat mK;         // 相机的内参数矩阵
@@ -322,7 +332,7 @@ protected:
     // Color order (true RGB, false BGR, ignored if grayscale)
     // RGB图像的颜色通道顺序
     bool mbRGB;
-};  //class Tracking
+  };  //class Tracking
 
 } //namespace ORB_SLAM
 

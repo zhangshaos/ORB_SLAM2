@@ -125,11 +125,13 @@ public:
    * @return false
    */
   bool IsInKeyFrame(KeyFrame* pKF);
+
   /**
    * @brief 告知可以观测到该MapPoint的Frame，该MapPoint已被删除
    *
    */
-  void SetBadFlag();
+  void EraseAndSetBad();
+
   /**
    * @brief 判断当前地图点是否是bad
    *
@@ -145,10 +147,11 @@ public:
    * @param[in] pMP 地图点
    */
   void Replace(MapPoint* pMP);
+
   /**
-   * @brief 获取取代当前地图点的点? //?
+   * @brief 获取取代当前地图点的点
    *
-   * @return MapPoint* //?
+   * @return MapPoint*
    */
   MapPoint* GetReplaced();
 
@@ -219,59 +222,53 @@ public:
   long unsigned int mnId;       // Global ID for MapPoint
   static long unsigned int nNextId;
   const long int mnFirstKFid;   // 创建该MapPoint的关键帧ID
-  // 呐,如果是从帧中创建的话,会将普通帧的id存放于这里
   const long int mnFirstFrame;  // 创建该MapPoint的帧ID（即每一关键帧有一个帧ID）
 
   // 被观测到的相机数目，单目+1，双目或RGB-D则+2
   int nObs;
 
   // Variables used by the tracking
-  float mTrackedProjX;             ///< 当前地图点投影到某帧上后的坐标
-  float mTrackedProjY;             ///< 当前地图点投影到某帧上后的坐标
-  int mnTrackedScaleLevel;         ///< 所处的尺度, 由其他的类进行操作
-  float mTrackedViewCosine;        ///< 被追踪到时,那帧相机看到当前地图点的视角
+  float mTrackedProjX;             // 当前地图点投影到某帧上后的坐标
+  float mTrackedProjY;             // 当前地图点投影到某帧上后的坐标
+  int mnTrackedScaleLevel;         // 所处的尺度, 由其他的类进行操作
+  float mTrackedViewCosine;        // 被追踪到时,那帧相机看到当前地图点的视角
 
-  // TrackLocalMap - ORBmatcher::SearchByProjection 中决定是否对该点进行投影的变量
+  // TrackLocalMap->ORBmatcher::SearchByProjection() 中决定是否对该点进行投影的变量
   // mbNeedTrackInView==false的点有几种：
   // a 已经和当前帧经过匹配（TrackReferenceKeyFrame，TrackWithMotionModel）但在优化过程中认为是外点
   // b 已经和当前帧经过匹配且为内点，这类点也不需要再进行投影
   // c 不在当前相机视野中的点（即未通过isInFrustum判断）
   bool mbNeedTrackInView;
 
-  // TrackLocalMap - UpdateLocalMapPoints 中防止将MapPoints重复添加至mvpLocalMapPoints的标记
+  // TrackLocalMap->UpdateLocalMapPoints() 中防止将MapPoints重复添加至mvpLocalMapPoints的标记
   long unsigned int mnTrackReferenceForFrame; // 标记当前地图点已被哪一帧追踪上
 
-  // TrackLocalMap - ProjectLocalPointsToCurrentFrame 中决定是否进行isInFrustum判断的变量
+  // TrackLocalMap->ProjectLocalPointsToCurrentFrame() 中决定是否进行isInFrustum判断的变量
   // mnLastFrameSeen==mCurrentFrame.mnId的点有几种：
   // a 已经和当前帧经过匹配（TrackReferenceKeyFrame，TrackWithMotionModel）但在优化过程中认为是外点
   // b 已经和当前帧经过匹配且为内点，这类点也不需要再进行投影
   long unsigned int mnLastFrameSeen; // 标记当前地图点已被哪一帧看到
 
-  // REVIEW 下面的....都没看明白
-  // Variables used by local mapping 为了避免重复引入地图点到某个集合中
+  // LocalBundleAdjustment() 中为了避免重复引入地图点到优化函数中
   long unsigned int mnLocalBAForKF;        // 在局部建图线程中适用，记录地图点对应当前局部BA的关键帧的mnId。
   long unsigned int mnFuseCandidateForKF;  // 在局部建图线程中使用,表示被用来进行地图点融合的关键帧mnId。
 
-  // Variables used by loop closing 为了避免重复引入地图点到某个集合中
-  // 在回环检测线程中被使用，标记当前地图点是作为哪个"当前关键帧"的回环地图点(即回环关键帧上的地图点)，
+  // LoopClosing -> CheckCurKFsTcwAndLoopMPs() 中为了
   // 避免在构建 LoopClosing.mvpLoopMapPoints 时，地图点被重复添加
-  long unsigned int mnLoopPointForKF;
-  // 如果这个地图点对应的关键帧参与到了回环检测的过程中，
-  // 那么在回环检测过程中已经使用了这个关键帧修正只有的位姿来修正了这个地图点,那么这个标志位置位
-  long unsigned int mnCorrectedByKF;
-  long unsigned int mnCorrectedReference;
+  long unsigned int mnLoopPointForKF; // 标记当前地图点是作为哪个"当前关键帧"的回环地图点(即回环关键帧上的地图点)
+
+  // LoopClosing -> CorrectLoop() 中为了避免地图点被相对位姿传播而重复矫正
+  long unsigned int mnCorrectedByKFLoop; ///< 标记当前地图点在某个KF（mpCurrentKF）形成的回环关系中矫正
+  long unsigned int mnCorrectedKFInLoop; ///< 标记当前地图在mnCorrectedByKFLoop形成的回环中，作为某个KF的地图点而被矫正
+
   // 全局BA优化后(如果当前地图点参加了的话),这里记录优化后的位姿
   cv::Mat mPosGBA;
+
   // 如果当前点的位姿参与到了全局BA优化,那么这个变量记录了那个引起全局BA的"当前关键帧"的id
   long unsigned int mnBAGlobalForKF;
-
-  // 全局BA中对当前点进行操作的时候使用的互斥量
-  static std::mutex mGlobalMutex;
-
 protected:
-
-  // Position in absolute coordinates
-  cv::Mat mWorldPos; ///< MapPoint在世界坐标系下的坐标
+  // MapPoint在世界坐标系下的坐标
+  cv::Mat mWorldPos;
 
   // Keyframes observing the point and associated index in keyframe
   // 观测到该MapPoint的KF和该MapPoint在KF中的索引
@@ -297,7 +294,8 @@ protected:
 
   // Bad flag (we do not currently erase MapPoint from memory)
   bool mbBad;
-  // 替换本地图点的点?
+
+  // 由于地图点融合，而替换此地图点的点
   MapPoint* mpReplaced;
 
   // Scale invariance distances
@@ -311,7 +309,6 @@ protected:
   std::mutex mMutexPos;
   // 对当前地图点的特征信息进行操作的时候的互斥量
   std::mutex mMutexFeatures;
-
 };
 
 

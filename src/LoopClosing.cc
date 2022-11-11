@@ -568,7 +568,7 @@ void LoopClosing::CorrectLoop()
       for(auto pMPi : vpMPsi)
       {
         // 跳过无效的地图点
-        if(!pMPi || pMPi->isBad() || pMPi->mnCorrectedByKF==mpCurrentKF->mnId)
+        if(!pMPi || pMPi->isBad() || pMPi->mnCorrectedByKFLoop == mpCurrentKF->mnId)
           continue;
 
         // 矫正过程本质上也是基于当前关键帧的优化后的位姿展开的
@@ -583,9 +583,9 @@ void LoopClosing::CorrectLoop()
         cv::Mat cvCorrectedP3Dw = Converter::toCvMat(eigenCorrectedP3Dw);
         pMPi->SetWorldPos(cvCorrectedP3Dw);
         // 记录矫正该地图点的关键帧id，防止重复
-        pMPi->mnCorrectedByKF = mpCurrentKF->mnId;
+        pMPi->mnCorrectedByKFLoop = mpCurrentKF->mnId;
         // 记录该地图点所在的关键帧id
-        pMPi->mnCorrectedReference = pKFi->mnId;
+        pMPi->mnCorrectedKFInLoop = pKFi->mnId;
         // 因为地图点更新了，需要更新其平均观测方向以及观测距离范围
         pMPi->UpdateNormalAndDepth();
       }
@@ -746,7 +746,7 @@ void LoopClosing::RequestReset()
   while(1)
   {
     {
-      unique_lock<mutex> lock2(mMutexReset);
+      unique_lock<mutex> lock(mMutexReset);
       if(!mbResetRequested)
         break;
     }
@@ -825,6 +825,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 
       // Get Map Mutex
       // 后续要更新地图所以要上锁
+      // todo: 解决可能的死锁问题
       unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
 
       // Correct keyframes starting at map first keyframe

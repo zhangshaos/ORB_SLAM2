@@ -10,19 +10,26 @@
 3. 运行 `./mono_shenzhen ./launch.toml` ，在Out/目录下保存结果。
 
 ## 注意
-- ORB_SLAM 地图初始化时，最好不要旋转视角，否则会导致很多错误匹配，导致初始化失败。
-  > 从实验测试上看，当初始化含有旋转时，**匹配数量和正确匹配占比都减小**了。  
-  > 无旋转：  
-  > nGood: 122, nBadInfinite: 0, nBadParallax: 5, nBadDepth: 16, nBadProject: 37  
-  > （180个匹配，好匹配占比为0.68）  
-  > 有旋转：  
-  > nGood: 52, nBadInfinite: 0, nBadParallax: 23, nBadDepth: 34, nBadProject: 30  
-  > （139个匹配，好匹配占比0.37）  
-  > nGood: 58, nBadInfinite: 0, nBadParallax: 25, nBadDepth: 29, nBadProject: 23  
-  > （135个匹配，好匹配占比0.43）  
-  > nGood: 30, nBadInfinite: 0, nBadParallax: 5, nBadDepth: 18, nBadProject: 48  
-  > （101个匹配，好匹配占比0.30）  
-  > 从很多数据上看，初始化的旋转导致视角太小，深度为负，这些应该是错误的特征点匹配导致的。  
+
+## UI介绍
+
+- 左侧地图展示窗口
+
+**蓝色**相机表示关键帧位置和朝向；  
+**绿色**相机表示当前帧位置和朝向；  
+相机之间**黑色**线段表示两个关键帧之间存在较强共视关系（被两关键帧共同看点的地图点数量大于100）；  
+相机之间**绿色**线段表示前一帧是后一帧的父亲，即生成树的前驱节点。
+
+**黑色**地图点表示当前帧的局部地图点；  
+**红色**地图点表示全局地图点中不在局部地图点的点。
+
+- 右侧图片特征展示窗口
+
+**绿色**点（矩阵）表示追踪上地图的特征点，**红色**点表示没有对应地图点的特征点；  
+**KFs** 表示地图中所有关键帧的数目；  
+**MPs** 表示第图中所有地图点的数目；  
+**Matches** 表示当前帧匹配上地图点的数目。  
+
 
 # ORB-SLAM2
 **Authors:** [Raul Mur-Artal](http://webdiis.unizar.es/~raulmur/), [Juan D. Tardos](http://webdiis.unizar.es/~jdtardos/), [J. M. M. Montiel](http://webdiis.unizar.es/~josemari/) and [Dorian Galvez-Lopez](http://doriangalvez.com/) ([DBoW2](https://github.com/dorian3d/DBoW2))

@@ -253,7 +253,6 @@ int System::TrackMonocularWithPose(const cv::Mat &im, double timestamp,
   mTrackingState = state;
   mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
   mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
-
   return state;
 }
 
@@ -284,7 +283,7 @@ bool System::SaveTrackedMap(const std::string &filePath)
     if (mpt && !mpt->isBad())
     {
       // todo: 对地图点点进行筛选
-      // mpt->GetFound();
+      int nFound = mpt->GetFound();
       Eigen::Vector3d wPos = Converter::toVector3d(mpt->GetWorldPos());
       Eigen::Vector3d camPos = mInPoseTcw * wPos;
       vertexesPos.emplace_back(std::array<double,3>{ camPos.x(), camPos.y(), camPos.z() });

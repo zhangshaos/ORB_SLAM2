@@ -932,9 +932,9 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
 
     int nIDr;
     // 该地图点在闭环检测中被当前KF调整过，那么使用调整它的KF id
-    if(pMP->mnCorrectedByKF==pCurKF->mnId)
+    if(pMP->mnCorrectedByKFLoop == pCurKF->mnId)
     {
-      nIDr = pMP->mnCorrectedReference;
+      nIDr = pMP->mnCorrectedKFInLoop;
     }
     else
     {

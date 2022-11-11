@@ -98,7 +98,7 @@ public:
      * @brief 按照权重对连接的关键帧进行排序
      * @detials 更新后的变量存储在 mvpOrderedConnectedKeyFrames 和 mvOrderedWeights 中
      */
-    void UpdateBestCovisibles();
+    void RankBestCovisibles();
 
     /**
      * @brief 得到与该关键帧连接的关键帧(没有排序的)
@@ -288,6 +288,13 @@ public:
     void EraseAndSetBad();
 
     /**
+     * @brief 当前关键帧即将被删除。
+     * @details 即mbShouldErase==true，参考mbShouldErase的注释
+     *
+     */
+    bool isComingBad();
+
+    /**
      * @brief 返回当前关键帧是否已经被删除了
      *
      */
@@ -432,32 +439,32 @@ protected:
     std::map<KeyFrame*, int> mConnectedKeyFrameWeights;
     // 共视关键帧中权重从大到小排序后的关键帧          
     std::vector<KeyFrame*> mvpOrderedConnectedKeyFrames;            
-    // 共视关键帧中从大到小排序后的权重，和上面对应
+    // 共视关键帧中从大到小排序后的权重，和mvpOrderedConnectedKeyFrames对应
     std::vector<int> mvOrderedWeights;                             
 
     /*****************************************************
      *          Spanning Tree and Loop Edges             *
      *****************************************************/
-    bool mbFirstConnection;                     // 是否是第一次生成树
+    bool mbFirstConnectInSpanningTree;          // 是否是第一次生成树
     KeyFrame* mpParent;                         // 当前关键帧的父关键帧 （共视程度最高的）
     std::set<KeyFrame*> mspChildrens;           // 存储当前关键帧的子关键帧
     std::set<KeyFrame*> mspLoopEdges;           // 和当前关键帧形成回环关系的关键帧
 
     // Bad flags
     bool mbPreventErase;        // 当前关键帧已经和其他的关键帧形成了回环关系，因此暂时不应该被删除
-    bool mbShouldErase;         // 表示当前帧应该被删除，但是由于设置了mbPreventErase导致删除操作延后
+    bool mbShouldErase;         // 表示当前帧应该被KeyFrameCulling删除，但是由于设置了mbPreventErase导致删除操作延后
     bool mbBad;                 // 只有 LocalMapping::KeyFrameCulling() 才负责真正地删除关键帧
 
     Map* mpMap;
 
     // 在对位姿进行操作时相关的互斥锁
-    std::mutex mMutexPose;
+    mutable std::mutex mMutexPose;
 
     // 在操作当前关键帧和其他关键帧的共视关系的时候使用到的互斥锁
-    std::mutex mMutexConnections;
+    mutable std::mutex mMutexConnections;
 
     // 在操作和特征点有关的变量的时候的互斥锁
-    std::mutex mMutexFeatures;
+    mutable std::mutex mMutexFeatures;
 };
 
 } //namespace ORB_SLAM

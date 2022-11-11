@@ -308,7 +308,15 @@ Tracking::trackImageWithPose(const cv::Mat &im,
       if(bOK) // 只有在成功追踪时才考虑生成关键帧的问题
       {
         // 更新显示中的位姿
-        mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.getPose());
+        {
+          //cv::Mat pose = mCurrentFrame.getPose().clone();
+          //LOG(INFO) << "Old Pose:\n" << pose;
+          //pose.at<float>(0, 3) /= 1000;
+          //pose.at<float>(1, 3) /= 1000;
+          //pose.at<float>(2, 3) /= 1000;
+          //LOG(INFO) << "New Pose:\n" << pose;
+          mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.getPose());
+        }
 
         // Step 6：清除观测不到的地图点
         for(int i=0; i<mCurrentFrame.N; i++)
@@ -549,8 +557,16 @@ void Tracking::CreateInitialMap(const std::vector<cv::Point3f>& vIniP3D)
   mpReferenceKF = pKFcur;
   mCurrentFrame.mpReferenceKF = pKFcur; // 也只能这样子设置了,毕竟是最近的关键帧
 
-  mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
-  mpMapDrawer->SetCurrentCameraPose(pKFcur->GetPose());
+  mpMap->SetLocalMapPoints(mvpLocalMapPoints);
+  {
+    //cv::Mat pose = pKFcur->GetPose().clone();
+    //LOG(INFO) << "Old Pose:\n" << pose;
+    //pose.at<float>(0, 3) /= 1000;
+    //pose.at<float>(1, 3) /= 1000;
+    //pose.at<float>(2, 3) /= 1000;
+    //LOG(INFO) << "New Pose:\n" << pose;
+    mpMapDrawer->SetCurrentCameraPose(pKFcur->GetPose());
+  }
   mpMap->mvpKeyFrameOrigins.push_back(pKFini);
   mLastFrame = Frame(mCurrentFrame);
   mState = OK; // 初始化成功，至此，初始化过程完成
@@ -605,14 +621,12 @@ bool Tracking::TrackLocalMap()
   // We have an estimation of the camera pose and some map points tracked in the frame.
   // We retrieve the local map and try to find matches to points in the local map.
 
-  // This is for visualization
-  // 设置参考地图点用于绘图显示局部地图点（红色）
-  mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
-
   // Update Local KeyFrames and Local Points
   // Step 1：用共视图更新局部关键帧 mvpLocalKeyFrames 和局部地图点 mvpLocalMapPoints
   UpdateLocalKeyFrames();
   UpdateLocalMapPoints();
+  // 设置参考地图点用于绘图显示局部地图点（红色）
+  mpMap->SetLocalMapPoints(mvpLocalMapPoints);
 
   // Step 2：筛选局部地图中新增的在视野范围内的地图点，投影到当前帧搜索匹配，得到更多的匹配关系
   int nNewMatches = ProjectLocalPointsToCurrentFrame();
@@ -808,7 +822,6 @@ int Tracking::ProjectLocalPointsToCurrentFrame()
     // 跳过坏点
     if(pMP->isBad())
       continue;
-
     // Project (this fills MapPoint variables for matching)
     // 判断地图点是否在在当前帧视野内
     if(mCurrentFrame.isInFrustum(pMP, 0.5))
@@ -851,21 +864,17 @@ void Tracking::UpdateLocalMapPoints()
   for(auto pKF : mvpLocalKeyFrames)
   {
     const vector<MapPoint*> vpMPs = pKF->GetMapPointMatches();
-
     // step 2：将局部关键帧的地图点添加到 mvpLocalMapPoints
     for(auto pMP : vpMPs)
     {
-      if(!pMP)
+      if(!pMP || pMP->isBad())
         continue;
       // 用该地图点的成员变量 mnTrackReferenceForFrame 记录当前帧的id
       // 表示它已经是当前帧的局部地图点了，可以防止重复添加局部地图点
       if(pMP->mnTrackReferenceForFrame==mCurrentFrame.mnId)
         continue;
-      if(!pMP->isBad())
-      {
-        mvpLocalMapPoints.push_back(pMP);
-        pMP->mnTrackReferenceForFrame=mCurrentFrame.mnId;
-      }
+      mvpLocalMapPoints.push_back(pMP);
+      pMP->mnTrackReferenceForFrame=mCurrentFrame.mnId;
     }
   }
 }

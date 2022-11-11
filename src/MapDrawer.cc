@@ -21,6 +21,7 @@
 #include <mutex>
 
 #include <pangolin/pangolin.h>
+#include <glog/logging.h>
 
 #include "MapPoint.h"
 #include "KeyFrame.h"
@@ -43,57 +44,53 @@ MapDrawer::MapDrawer(Map* pMap, const string &strSettingPath):mpMap(pMap)
   mPointSize = fSettings["Viewer.PointSize"];
   mCameraSize = fSettings["Viewer.CameraSize"];
   mCameraLineWidth = fSettings["Viewer.CameraLineWidth"];
-
+  mCoordinateScale = fSettings["Viewer.CoordinateScale"];
 }
 
 void MapDrawer::DrawMapPoints()
 {
-  //取出所有的地图点
-  const vector<MapPoint*> &vpMPs = mpMap->GetAllMapPoints();
-  //取出mvpReferenceMapPoints，也即局部地图d点
-  const vector<MapPoint*> &vpRefMPs = mpMap->GetReferenceMapPoints();
-
-  //将vpRefMPs从vector容器类型转化为set容器类型，便于使用set::count快速统计 - 我觉得称之为"重新构造"可能更加合适一些
-  //补充, set::count用于返回集合中为某个值的元素的个数
+  // 取出所有的地图点
+  const vector<MapPoint*> vpMPs = mpMap->GetAllMapPoints();
+  // 取出mvpReferenceMapPoints，也即局部地图点
+  const vector<MapPoint*> vpRefMPs = mpMap->GetLocalMapPoints();
   set<MapPoint*> spRefMPs(vpRefMPs.begin(), vpRefMPs.end());
 
   if(vpMPs.empty())
     return;
 
   // for AllMapPoints
-  //显示所有的地图点（不包括局部地图点），大小为2个像素，黑色
+  // 显示其他的地图点（不包括局部地图点），大小为2个像素，红色
   glPointSize(mPointSize);
   glBegin(GL_POINTS);
-  glColor3f(0.0,0.0,0.0);         //黑色
-
-  for(size_t i=0, iend=vpMPs.size(); i<iend;i++)
+  glColor3f(1.0,0.0,0.0);
+  for(auto mp : vpMPs)
   {
     // 不包括ReferenceMapPoints（局部地图点）
-    if(vpMPs[i]->isBad() || spRefMPs.count(vpMPs[i]))
+    if(mp->isBad() || spRefMPs.count(mp))
       continue;
-    cv::Mat pos = vpMPs[i]->GetWorldPos();
+    cv::Mat pos = mp->GetWorldPos();
+    pos *= mCoordinateScale;
     glVertex3f(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
   }
   glEnd();
 
   // for ReferenceMapPoints
-  //显示局部地图点，大小为2个像素，红色
+  // 显示局部地图点，大小为2个像素，黑色
   glPointSize(mPointSize);
   glBegin(GL_POINTS);
-  glColor3f(1.0,0.0,0.0);
-
+  glColor3f(0.0,0.0,0.0);
   for(auto spRefMP : spRefMPs)
   {
     if(spRefMP->isBad())
       continue;
     cv::Mat pos = spRefMP->GetWorldPos();
+    pos *= mCoordinateScale;
     glVertex3f(pos.at<float>(0),pos.at<float>(1),pos.at<float>(2));
-
   }
   glEnd();
 }
 
-//关于gl相关的函数，可直接google, 并加上msdn关键词
+
 void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 {
   //历史关键帧图标：宽度占总宽度比例为0.05
@@ -108,14 +105,15 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
   //通过显示界面选择是否显示历史关键帧图标
   if(bDrawKF)
   {
-    for(size_t i=0; i<vpKFs.size(); i++)
+    for(auto pKF : vpKFs)
     {
-      KeyFrame* pKF = vpKFs[i];
       //NOTICE 转置, OpenGL中的矩阵为列优先存储
       cv::Mat Twc = pKF->GetPoseInverse().t();
+      Twc.at<float>(3, 0) *= mCoordinateScale;
+      Twc.at<float>(3, 1) *= mCoordinateScale;
+      Twc.at<float>(3, 2) *= mCoordinateScale;
 
       glPushMatrix();
-
       //（由于使用了glPushMatrix函数，因此当前帧矩阵为世界坐标系下的单位矩阵）
       //因为OpenGL中的矩阵为列优先存储，因此实际为Tcw，即相机在世界坐标下的位姿
       //NOTICE 竟然还可以这样写,牛逼牛逼
@@ -163,63 +161,79 @@ void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
   //通过显示界面选择是否显示关键帧连接关系
   if(bDrawGraph)
   {
-    //设置绘制图形时线的宽度
-    glLineWidth(mGraphLineWidth);
-    //设置共视图连接线为绿色，透明度为0.6f
-    glColor4f(0.0f,1.0f,0.0f,0.6f);
-    glBegin(GL_LINES);  //绘制线条的时候,默认是按照添加顺序,每两个点之间绘制一条直线
-
-    for(size_t i=0; i<vpKFs.size(); i++)
+    for(auto pKF : vpKFs)
     {
+      cv::Mat Ow = pKF->GetCameraCenter();
       // Covisibility Graph (共视图)
       // step 3.1 共视程度比较高的共视关键帧用线连接
-      //遍历每一个关键帧，得到它们共视程度比较高的关键帧
-      const vector<KeyFrame*> vCovKFs = vpKFs[i]->GetCovisiblesByWeight(100);
-      //遍历每一个关键帧，得到它在世界坐标系下的相机坐标
-      cv::Mat Ow = vpKFs[i]->GetCameraCenter();
+      // 遍历每一个关键帧，得到它们共视程度比较高的关键帧
+      const vector<KeyFrame*> vCovKFs = pKF->GetCovisiblesByWeight(100);
       if(!vCovKFs.empty())
       {
-        for(auto vCovKF : vCovKFs)
+        glLineWidth(mGraphLineWidth);
+        glColor4f(0.0f,0.0f,0.0f,0.3f); // 设置共视图连接线为黑色，透明度为0.3f
+        glBegin(GL_LINES);
+        for (auto covKF: vCovKFs)
         {
-          //单向绘制
-          if(vCovKF->mnId<vpKFs[i]->mnId)
+          if (covKF->mnId < pKF->mnId)
+            // 单向绘制
             continue;
-          cv::Mat Ow2 = vCovKF->GetCameraCenter();
-          glVertex3f(Ow.at<float>(0),Ow.at<float>(1),Ow.at<float>(2));
-          glVertex3f(Ow2.at<float>(0),Ow2.at<float>(1),Ow2.at<float>(2));
+          cv::Mat Ow2 = covKF->GetCameraCenter();
+          glVertex3f(Ow.at<float>(0) * mCoordinateScale,
+                     Ow.at<float>(1) * mCoordinateScale,
+                     Ow.at<float>(2) * mCoordinateScale);
+          glVertex3f(Ow2.at<float>(0) * mCoordinateScale,
+                     Ow2.at<float>(1) * mCoordinateScale,
+                     Ow2.at<float>(2) * mCoordinateScale);
         }
+        glEnd();
       }
 
       // Spanning tree
       // step 3.2 连接最小生成树 (PS: 我觉得这里并不是权值最小,而是其中的边对于其他的图来讲是最少的)
-      // 这个部分的理论知识还不是很了解
-      KeyFrame* pParent = vpKFs[i]->GetParent();
+      KeyFrame* pParent = pKF->GetParent();
       if(pParent)
       {
         cv::Mat Owp = pParent->GetCameraCenter();
-        glVertex3f(Ow.at<float>(0),Ow.at<float>(1),Ow.at<float>(2));
-        glVertex3f(Owp.at<float>(0),Owp.at<float>(1),Owp.at<float>(2));
+        glLineWidth(2*mGraphLineWidth);
+        glColor4f(0.f, 1.f, 0.f, 1.f);
+        glBegin(GL_LINES);
+        glVertex3f(Ow.at<float>(0) * mCoordinateScale,
+                   Ow.at<float>(1) * mCoordinateScale,
+                   Ow.at<float>(2) * mCoordinateScale);
+        glVertex3f(Owp.at<float>(0) * mCoordinateScale,
+                   Owp.at<float>(1) * mCoordinateScale,
+                   Owp.at<float>(2) * mCoordinateScale);
+        glEnd();
       }
 
       // Loops
       // step 3.3 连接闭环时形成的连接关系
-      // 这个部分也不是非常明白
-      set<KeyFrame*> sLoopKFs = vpKFs[i]->GetLoopEdges();
-      for(auto sLoopKF : sLoopKFs)
+      set<KeyFrame*> sLoopKFs = pKF->GetLoopEdges();
+      if (!sLoopKFs.empty())
       {
-        if(sLoopKF->mnId<vpKFs[i]->mnId)
-          continue;
-        cv::Mat Owl = sLoopKF->GetCameraCenter();
-        glVertex3f(Ow.at<float>(0),Ow.at<float>(1),Ow.at<float>(2));
-        glVertex3f(Owl.at<float>(0),Owl.at<float>(1),Owl.at<float>(2));
+        glLineWidth(2*mGraphLineWidth);
+        glColor4f(0.f, 0.f, 1.f, 1.f);
+        glBegin(GL_LINES);
+        for (auto loopKF: sLoopKFs)
+        {
+          if (loopKF->mnId < pKF->mnId)
+            continue;
+          cv::Mat Owl = loopKF->GetCameraCenter();
+          glVertex3f(Ow.at<float>(0) * mCoordinateScale,
+                     Ow.at<float>(1) * mCoordinateScale,
+                     Ow.at<float>(2) * mCoordinateScale);
+          glVertex3f(Owl.at<float>(0) * mCoordinateScale,
+                     Owl.at<float>(1) * mCoordinateScale,
+                     Owl.at<float>(2) * mCoordinateScale);
+        }
+        glEnd();
       }
-    }
-
-    glEnd();
-  }
+    }// 遍历完所有的关键帧
+  }// 绘制共视图
 }
 
-//关于gl相关的函数，可直接google, 并加上msdn关键词
+
 void MapDrawer::DrawCurrentCamera(pangolin::OpenGlMatrix &Twc)
 {
   //相机模型大小：宽度占总宽度比例为0.08
@@ -227,9 +241,7 @@ void MapDrawer::DrawCurrentCamera(pangolin::OpenGlMatrix &Twc)
   const float h = w*0.75;
   const float z = w*0.6;
 
-  //百度搜索：glPushMatrix 百度百科
   glPushMatrix();
-
   //将4*4的矩阵Twc.m右乘一个当前矩阵
   //（由于使用了glPushMatrix函数，因此当前帧矩阵为世界坐标系下的单位矩阵）
   //因为OpenGL中的矩阵为列优先存储，因此实际为Tcw，即相机在世界坐标下的位姿
@@ -306,9 +318,9 @@ void MapDrawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M)
     M.m[10] = Rwc.at<float>(2,2);
     M.m[11]  = 0.0;
 
-    M.m[12] = twc.at<float>(0);
-    M.m[13] = twc.at<float>(1);
-    M.m[14] = twc.at<float>(2);
+    M.m[12] = twc.at<float>(0) * mCoordinateScale;
+    M.m[13] = twc.at<float>(1) * mCoordinateScale;
+    M.m[14] = twc.at<float>(2) * mCoordinateScale;
     M.m[15]  = 1.0;
   }
   else

@@ -28,11 +28,11 @@
 #include "Map.h"
 #include "Tracking.h"
 #include "FrameDrawer.h"
+#include "Viewer.h"
 
 
 namespace ORB_SLAM2
 {
-
 //构造函数
 FrameDrawer::FrameDrawer(Map* pMap):
   mpMap(pMap),
@@ -51,80 +51,105 @@ FrameDrawer::FrameDrawer(Map* pMap):
 cv::Mat FrameDrawer::DrawFrame()
 {
   cv::Mat im;
-  vector<cv::KeyPoint> vIniKeys; // Initialization: KeyPoints in reference frame
-  vector<int> vMatches; // Initialization: correspondeces with reference keypoints
+  vector<cv::KeyPoint> vIniKeys;     // Initialization: KeyPoints in reference frame
+  vector<int> vMatches;              // Initialization: correspondeces with reference keypoints
   vector<cv::KeyPoint> vCurrentKeys; // KeyPoints in current frame
-  vector<bool> vbVO, vbMap; // Tracked MapPoints in current frame
+  vector<bool> vbVO, vbMap;          // Tracked MapPoints in current frame
   int state; // Tracking state
 
-  //Copy variables within scoped mutex
   // step 1：将成员变量赋值给局部变量（包括图像、状态、其它的提示）
-  //NOTICE 加互斥锁，避免与FrameDrawer::Update函数中图像拷贝发生冲突
+  // NOTICE 加互斥锁，避免与FrameDrawer::Update函数中图像拷贝发生冲突
   {
     unique_lock<mutex> lock(mMutex);
-    state=mState;
+    state = mState;
     if(mState==Tracking::SYSTEM_NOT_READY)
-      mState=Tracking::NO_IMAGES_YET;
+      mState = Tracking::NO_IMAGES_YET;
 
-    //NOTICE 这里使用copyTo进行深拷贝是因为后面会把单通道灰度图像转为3通道图像
-    mIm.copyTo(im);
+    // NOTICE 这里使用copyTo进行深拷贝是因为后面会把单通道灰度图像转为3通道图像
+    if (mIm.rows <= Viewer::MaxViewerHeight && mIm.cols <= Viewer::MaxViewerWidth)
+      mIm.copyTo(im);
+    else
+      im = ResizeWithoutMoirePattern(mIm, Viewer::MaxViewerHeight, Viewer::MaxViewerWidth);
+    // 特征点坐标的缩放系数
+    float xScale = (float)im.cols / (float)mIm.cols,
+          yScale = (float)im.rows / (float)mIm.rows;
 
-    //没有初始化的时候
+    // 没有初始化的时候
     if(mState==Tracking::NOT_INITIALIZED)
     {
-      //获取当前帧\参考帧的特征点,并且得到他们的匹配关系
-      vCurrentKeys = mvCurrentKeys;
-      vIniKeys = mvIniKeys;
+      // 获取当前帧和参考帧的特征点,并且得到他们的匹配关系
+      vCurrentKeys.clear();
+      for (const auto& k : mvCurrentKeys)
+      {
+        vCurrentKeys.emplace_back(k);
+        vCurrentKeys.back().pt.x *= xScale;
+        vCurrentKeys.back().pt.y *= yScale;
+      }
+      vIniKeys.clear();
+      for (const auto& k : mvIniKeys)
+      {
+        vIniKeys.emplace_back(k);
+        vIniKeys.back().pt.x *= xScale;
+        vIniKeys.back().pt.y *= yScale;
+      }
       vMatches = mvIniMatches;
     }
     else if(mState==Tracking::OK)
     {
-      //当系统处于运动追踪状态时
-      vCurrentKeys = mvCurrentKeys;
+      // 当系统处于运动追踪状态时
+      vCurrentKeys.clear();
+      for (const auto& k : mvCurrentKeys)
+      {
+        vCurrentKeys.emplace_back(k);
+        vCurrentKeys.back().pt.x *= xScale;
+        vCurrentKeys.back().pt.y *= yScale;
+      }
       vbVO = mvbVO;
-      vbMap = mvbMap;
+      vbMap = mvbKeyPtInMap;
     }
     else if(mState==Tracking::LOST)
     {
-      //跟丢的时候就之获得当前帧的特征点就可以了
-      vCurrentKeys = mvCurrentKeys;
+      // 跟丢的时候就之获得当前帧的特征点就可以了
+      vCurrentKeys.clear();
+      for (const auto& k : mvCurrentKeys)
+      {
+        vCurrentKeys.emplace_back(k);
+        vCurrentKeys.back().pt.x *= xScale;
+        vCurrentKeys.back().pt.y *= yScale;
+      }
     }
-  } // destroy scoped mutex -> release mutex
+  }
 
-  if(im.channels()<3) //this should be always true
+  if(im.channels()<3) // this should be always true
     cv::cvtColor(im,im,CV_GRAY2BGR);
 
-  //Draw
   // step 2：绘制初始化轨迹连线，绘制特征点边框（特征点用小框圈住）
   // step 2.1：初始化时，当前帧的特征坐标与初始帧的特征点坐标连成线，形成轨迹
   if(state==Tracking::NOT_INITIALIZED) //INITIALIZING
   {
     for(unsigned int i=0; i<vMatches.size(); i++)
-    {
-      //绘制当前帧特征点到下一帧特征点的连线,其实就是匹配关系
-      //NOTICE 就是当初看到的初始化过程中图像中显示的绿线
+      // 绘制当前帧特征点到下一帧特征点的连线,其实就是匹配关系
+      // NOTICE 就是当初看到的初始化过程中图像中显示的绿线
       if(vMatches[i]>=0)
-      {
-        cv::line(im,vIniKeys[i].pt,vCurrentKeys[vMatches[i]].pt,
-                 cv::Scalar(0,255,0));
-      }
-    }
-  }
-  else if(state==Tracking::OK) //TRACKING
+        cv::arrowedLine(im,
+                        vIniKeys[i].pt,
+                        vCurrentKeys[vMatches[i]].pt,
+                        cv::Scalar(0,255,0));
+  } else if(state==Tracking::OK) //TRACKING
   {
-    //当前帧追踪到的特征点计数
+    // 当前帧追踪到的特征点计数
     mnTracked=0;
     mnTrackedVO=0;
 
     // Draw keypoints
     const float r = 5;
-    const int n = vCurrentKeys.size();
-    for(int i=0;i<n;i++)
+    const int N = vCurrentKeys.size();
+    for(int i=0; i < N; i++)
     {
-      //如果这个点在视觉里程计中有(应该是追踪成功了的意思吧),在局部地图中也有
+      // 如果这个点在视觉里程计中有(应该是追踪成功了的意思吧),在局部地图中也有
       if(vbVO[i] || vbMap[i])
       {
-        //在特征点附近正方形选择四个点
+        // 在特征点附近正方形选择四个点
         cv::Point2f pt1,pt2;
         pt1.x=vCurrentKeys[i].pt.x-r;
         pt1.y=vCurrentKeys[i].pt.y-r;
@@ -140,23 +165,26 @@ cv::Mat FrameDrawer::DrawFrame()
           cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(0,255,0),-1);
           mnTracked++;
         }
-          //BUG 但是不知道为什么，我在实际运行中时没有发现有蓝色的点存在啊
         else // This is match to a "visual odometry" MapPoint created in the last frame
         {
+          // BUG 但是不知道为什么，我在实际运行中时没有发现有蓝色的点存在啊？
+          // 这些点，可能是在 RGB-D 相机中得到的那些点，在单目中没有
           // 通道顺序为bgr， NOTICE 仅当前帧能观测到的MapPoints用蓝色圆点表示，并用蓝色小方框圈住
           cv::rectangle(im,pt1,pt2,cv::Scalar(255,0,0));
           cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(255,0,0),-1);
           mnTrackedVO++;
         }
-      }
-    }//遍历所有的特征点
+      } else
+        // 未匹配到的特征点，用红色标出
+        cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(0,0,255),-1);
+    } //遍历所有的特征点
   }
 
-  //然后写入状态栏的信息
+  // 然后写入状态栏的信息
   cv::Mat imWithInfo;
-  DrawTextInfo(im,state, imWithInfo);
+  DrawTextInfo(im, state, imWithInfo);
 
-  //返回生成的图像
+  // 返回生成的图像
   return imWithInfo;
 }
 
@@ -175,7 +203,7 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
     int nKFs = mpMap->KeyFramesInMap();
     int nMPs = mpMap->MapPointsInMap();
     s << "KFs: " << nKFs << ", MPs: " << nMPs << ", Matches: " << mnTracked;
-    //在视觉里程计中匹配到的
+    // 在视觉里程计中匹配到的
     if(mnTrackedVO>0)
       s << ", + VO matches: " << mnTrackedVO;
   }
@@ -195,7 +223,7 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
     cv::FONT_HERSHEY_PLAIN,     //字体
     1,                          //字体缩放
     1,                          //粗细
-    &baseline);                 //基线,相对于最低端的文本点的,y坐标  //? 不是太明白
+    &baseline);                 //基线,相对于最低端的文本点的,y坐标？不是太明白
   //扩展图像
   imText = cv::Mat(im.rows+textSize.height+10,im.cols,im.type());
   im.copyTo(imText.rowRange(0,im.rows).colRange(0,im.cols));
@@ -228,7 +256,7 @@ void FrameDrawer::Update(Tracking *pTracker)
   mvCurrentKeys=pTracker->mCurrentFrame.mvKeys;
   N = mvCurrentKeys.size();
   mvbVO = vector<bool>(N,false);
-  mvbMap = vector<bool>(N,false);
+  mvbKeyPtInMap = vector<bool>(N, false);
 
   //如果上一帧的时候,追踪器没有进行初始化
   if(pTracker->mLastProcessedState==Tracking::NOT_INITIALIZED)
@@ -248,7 +276,7 @@ void FrameDrawer::Update(Tracking *pTracker)
       {
         // 该mappoints可以被多帧观测到，则为有效的地图点
         if(pMP->Observations()>0)
-          mvbMap[i]=true;
+          mvbKeyPtInMap[i]=true;
         else
           //否则表示这个特征点是在当前帧中第一次提取得到的点
           mvbVO[i]=true;
@@ -258,5 +286,24 @@ void FrameDrawer::Update(Tracking *pTracker)
   //更新追踪线程的跟踪状态
   mState=static_cast<int>(pTracker->mLastProcessedState);
 }
+
+
+cv::Mat ResizeWithoutMoirePattern(const cv::Mat& im, int h, int w, int scaleTimes)
+{
+  int oH = im.rows, oW = im.cols;
+  std::vector<int> heights(scaleTimes), widths(scaleTimes);
+  for (int t=0; t<scaleTimes-1; ++t)
+  {
+    heights[t] = oH + (h-oH) * ((t+1.f) / (float)scaleTimes);
+    widths[t]  = oW + (w-oH) * ((t+1.f) / (float)scaleTimes);
+  }
+  heights[scaleTimes-1] = h;
+  widths[scaleTimes-1]  = w;
+  cv::Mat target = im.clone();
+  for (int i=0; i< scaleTimes; ++i)
+    cv::resize(target, target, cv::Size(widths[i], heights[i]));
+  return target;
+}
+
 
 } //namespace ORB_SLAM

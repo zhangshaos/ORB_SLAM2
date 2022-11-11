@@ -34,6 +34,11 @@ namespace ORB_SLAM2
 class Map;
 class KeyFrame;
 
+
+/**
+ * @brief 绘制相机位姿、地图点位置、共视图等
+ *
+ */
 class MapDrawer
 {
 public:
@@ -87,23 +92,25 @@ public:
 private:
 
   //绘制这些部件的参数
-  ///关键帧-大小
+  //关键帧-大小
   float mKeyFrameSize;
-  ///关键帧-线宽
+  //关键帧-线宽
   float mKeyFrameLineWidth;
-  ///共视图的线宽
+  //共视图的线宽
   float mGraphLineWidth;
-  ///地图点的大小
+  //地图点的大小
   float mPointSize;
-  ///绘制的相机的大小
+  //绘制的相机的大小
   float mCameraSize;
-  ///绘制相机的线宽
+  //绘制相机的线宽
   float mCameraLineWidth;
+  //坐标系缩放项，坐标系太大，UI显示不了地图点
+  float mCoordinateScale;
 
-  ///相机位置
+  //相机位置
   cv::Mat mCameraPose;
 
-  ///线程互斥量
+  //线程互斥量
   std::mutex mMutexCamera;
 };
 

@@ -73,7 +73,7 @@ public:
      * 
      * @param[in] vpMPs 地图点们
      */
-    void SetReferenceMapPoints(const std::vector<MapPoint*> &vpMPs);
+    void SetLocalMapPoints(const std::vector<MapPoint*> &vpMPs);
     /**
      * @brief 这个函数好像没有被用到过
      * 
@@ -113,7 +113,7 @@ public:
      * 
      * @return std::vector<MapPoint*> 获得的参考地图点序列
      */
-    std::vector<MapPoint*> GetReferenceMapPoints();
+    std::vector<MapPoint*> GetLocalMapPoints();
 
     /**
      * @brief 获得当前地图中的地图点个数
@@ -121,6 +121,7 @@ public:
      * @return long unsigned int 个数
      */
     long unsigned int MapPointsInMap();
+
     /**
      * @brief 获取当前地图中的关键帧个数
      * 
@@ -135,17 +136,20 @@ public:
      */
     long unsigned int GetMaxKFid();
 
-    /** @brief 清空地图 */
+    /**
+     * @brief 清空地图
+     *
+     */
     void clear();
 
     // 保存了最初始的关键帧
     std::vector<KeyFrame*> mvpKeyFrameOrigins;
 
-    ///当更新地图时的互斥量.回环检测中和局部BA后更新全局地图的时候会用到这个
+    // 当更新地图时的互斥量.回环检测中和局部BA后更新全局地图的时候会用到这个
     std::mutex mMutexMapUpdate;
 
     // This avoid that two points are created simultaneously in separate threads (id conflict)
-    ///为了避免地图点id冲突设计的互斥量
+    // 为了避免地图点id冲突设计的互斥量
     std::mutex mMutexPointCreation;
 
 protected:
@@ -155,17 +159,17 @@ protected:
     // 存储所有的关键帧
     std::set<KeyFrame*> mspKeyFrames; 
 
-    // 参考地图点
-    std::vector<MapPoint*> mvpReferenceMapPoints;
+    // 局部地图点
+    std::vector<MapPoint*> mvpLocalMapPoints;
 
-    ///当前地图中具有最大ID的关键帧
+    // 当前地图中具有最大ID的关键帧
     long unsigned int mnMaxKFid;
 
     // 貌似在程序中并没有被使用过
     // Index related to a big change in the map (loop closure, global BA)
     int mnBigChangeIdx;
 
-    ///类的成员函数在对类成员变量进行操作的时候,防止冲突的互斥量
+    // 类的成员函数在对类成员变量进行操作的时候,防止冲突的互斥量
     std::mutex mMutexMap;
 };
 

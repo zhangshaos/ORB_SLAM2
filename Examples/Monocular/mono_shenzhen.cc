@@ -80,16 +80,16 @@ std::vector<Sophus::SE3d> loadCamerasPose(const std::string &filepath, Sophus::S
         isOriginInitialized = true;
       }
       Sophus::SE3d Toc = Tow * Twc;
-      const Eigen::Vector3d oneStep(0, 0, 1);
-      const Eigen::Vector3d endPos = Toc * oneStep;
-      const Eigen::Vector3d startPos = Toc * Eigen::Vector3d::Zero();
-      const Eigen::Vector3d dir = (endPos - startPos).normalized();
-      LOG(INFO)
-      << "Camera Pose Toc:\n" << Toc.matrix()
-      << "\nStart Pos: " << startPos.transpose()
-      << "\nEnd Pos: " << endPos.transpose()
-      << "\nDirection is: " << dir.transpose();
-       Tco_s.emplace_back(Toc.inverse());
+      //const Eigen::Vector3d oneStep(0, 0, 1);
+      //const Eigen::Vector3d endPos = Toc * oneStep;
+      //const Eigen::Vector3d startPos = Toc * Eigen::Vector3d::Zero();
+      //const Eigen::Vector3d dir = (endPos - startPos).normalized();
+      //LOG(INFO)
+      //<< "Camera Pose Toc:\n" << Toc.matrix()
+      //<< "\nStart Pos: " << startPos.transpose()
+      //<< "\nEnd Pos: " << endPos.transpose()
+      //<< "\nDirection is: " << dir.transpose();
+      Tco_s.emplace_back(Toc.inverse());
     }
   }
   if (revertTransform)
@@ -109,7 +109,6 @@ int Main(int argc, char* argv[])
     LOG(ERROR) << fmt::format("toml::parse_file cause error in {}->{}(...).", __FILE__, __FUNCTION__ );
     throw;
   }
-
   // Retrieve paths to images
   auto imagesFilename = loadImages(args["ImagesCollectionPath"].ref<std::string>());
   Sophus::SE3d revertM;
@@ -122,32 +121,27 @@ int Main(int argc, char* argv[])
     << "\ncamerasPose.size(): " << camerasPose.size();
     throw std::runtime_error("Sizes of 'ImagesCollectionPath' and 'CameraPoseCollectionPath' are not equal!");
   }
-
   // Create slamSystem system.
   // It initializes all system threads and gets ready to process frames.
   ORB_SLAM2::System slamSystem(args["FBoWVocabularyPath"].ref<std::string>(),
                                args["ORBSLAMConfigPath"].ref<std::string>(),
                                true);
-
   // Main loop
   double timeStamp = 0.0;
   for(size_t i=0, iend=imagesFilename.size(); i < iend; ++i)
   {
     this_thread::sleep_for(0.5s);
-
     // Read image from file
     cv::Mat im = cv::imread(imagesFilename[i], cv::IMREAD_UNCHANGED);
     if(im.empty())
     {
       LOG(INFO) << fmt::format("\nFailed to load image at: {}\n", imagesFilename[i]);
-      return 1;
+      return EXIT_FAILURE;
     }
-
     // Pass the image to the slamSystem system
     int trackState = slamSystem.TrackMonocularWithPose(im, (timeStamp+=0.1),
                                                        camerasPose[i],
                                                        imagesFilename[i]);
-
     // Compute the depth of each tracked key points.
     if (trackState == ORB_SLAM2::Tracking::State::OK)
     {
@@ -156,15 +150,11 @@ int Main(int argc, char* argv[])
       slamSystem.SaveTrackedMap(trackedFilename);
     }
   }
-
   LOG(INFO) << "\nPress ENTER to shut down the SLAM system...\n";
   std::cin.get();
-
   // Stop all threads
   slamSystem.Shutdown();
-
   slamSystem.SaveMap("../../Examples/Monocular/Out/Map.ply", &revertM);
-
   return 0;
 }
 

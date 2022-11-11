@@ -482,7 +482,6 @@ bool Frame::PosInGrid(const cv::KeyPoint &kp, int &posX, int &posY)
  */
 void Frame::ComputeBoW()
 {
-
   // 判断是否以前已经计算过了，计算过了就跳过
   if(mBowVec.empty())
   {

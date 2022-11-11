@@ -34,8 +34,7 @@ namespace ORB_SLAM2
 
 using namespace std;
 
-long unsigned int MapPoint::nNextId=0;
-std::mutex MapPoint::mGlobalMutex;
+long unsigned int MapPoint::nNextId = 0;
 
 /**
  * @brief Construct a new Map Point:: Map Point object
@@ -55,8 +54,8 @@ MapPoint::MapPoint(const cv::Mat &Pos,  //地图点的世界坐标
     mnLocalBAForKF(0),                      //
     mnFuseCandidateForKF(0),                //
     mnLoopPointForKF(0),                    //
-    mnCorrectedByKF(0),                     //
-    mnCorrectedReference(0),                //
+    mnCorrectedByKFLoop(0),                     //
+    mnCorrectedKFInLoop(0),                //
     mnBAGlobalForKF(0),                     //
     mpRefKF(pRefKF),                        //
     mnVisible(1),                           //在帧中的可视次数
@@ -99,8 +98,8 @@ MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF
   mnLocalBAForKF(0),
   mnFuseCandidateForKF(0),
   mnLoopPointForKF(0),
-  mnCorrectedByKF(0),
-  mnCorrectedReference(0),
+  mnCorrectedByKFLoop(0),
+  mnCorrectedKFInLoop(0),
   mnBAGlobalForKF(0),
   mpRefKF(nullptr),
   mnVisible(1),
@@ -146,9 +145,7 @@ MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF
 //设置地图点在世界坐标系下的坐标
 void MapPoint::SetWorldPos(const cv::Mat &Pos)
 {
-    unique_lock<mutex> lock2(mGlobalMutex, std::defer_lock);
-    unique_lock<mutex> lock(mMutexPos, std::defer_lock);
-    std::lock(lock, lock2);
+    unique_lock<mutex> lock(mMutexPos);
     Pos.copyTo(mWorldPos);
 }
 
@@ -220,7 +217,7 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
 
     if(bBad)
         // 告知可以观测到该MapPoint的Frame，该MapPoint已被删除
-        SetBadFlag();
+      EraseAndSetBad();
 }
 
 // 能够观测到当前地图点的所有关键帧及该地图点在KF中的索引
@@ -241,7 +238,7 @@ int MapPoint::Observations()
  * @brief 告知可以观测到该MapPoint的Frame，该MapPoint已被删除
  * 
  */
-void MapPoint::SetBadFlag()
+void MapPoint::EraseAndSetBad()
 {
     map<KeyFrame*,size_t> obs;
     {
@@ -341,9 +338,9 @@ void MapPoint::Replace(MapPoint* pMP)
 // 没有经过 MapPointCulling 检测的MapPoints, 认为是坏掉的点
 bool MapPoint::isBad()
 {
-    unique_lock<mutex> lock(mMutexFeatures, std::defer_lock);
+    unique_lock<mutex> lock1(mMutexFeatures, std::defer_lock);
     unique_lock<mutex> lock2(mMutexPos, std::defer_lock);
-    std::lock(lock, lock2);
+    std::lock(lock1, lock2);
     return mbBad;
 }
 
@@ -396,7 +393,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
 
     // Step 1 获取该地图点所有有效的观测关键帧信息
     {
-        unique_lock<mutex> lock1(mMutexFeatures);
+        unique_lock<mutex> lock(mMutexFeatures);
         if(mbBad)
             return;
         observations = mObservations;
@@ -551,7 +548,7 @@ void MapPoint::UpdateNormalAndDepth()
     const int nLevels = pRefKF->mnScaleLevels;                              // 金字塔总层数，默认为8
 
     {
-        unique_lock<mutex> lock3(mMutexPos);
+        unique_lock<mutex> lock(mMutexPos);
         // 使用方法见PredictScale函数前的注释
         mfMaxDistance = dist*levelScaleFactor;                              // 观测到该点的距离上限
         mfMinDistance = mfMaxDistance/pRefKF->mvScaleFactors[nLevels-1];    // 观测到该点的距离下限

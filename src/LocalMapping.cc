@@ -238,14 +238,14 @@ void LocalMapping::MapPointCulling()
             // mnFound ：地图点被多少帧（包括普通帧）看到，次数越多越好
             // mnVisible：地图点应该被看到的次数
             // (mnFound/mnVisible）：对于大FOV镜头这个比例会高，对于窄FOV镜头这个比例会低
-            pMP->SetBadFlag();
+          pMP->EraseAndSetBad();
             lit = mlpRecentAddedMapPoints.erase(lit);
         }
         else if(((int)nCurrentKFid-(int)pMP->mnFirstKFid)>=2 && pMP->Observations()<=cnThObs)
         {
             // Step 2.3：从该点建立开始，到现在已经过了不小于2个关键帧
             // 但是观测到该点的相机数却不超过阈值cnThObs，从地图中删除
-            pMP->SetBadFlag();
+          pMP->EraseAndSetBad();
             lit = mlpRecentAddedMapPoints.erase(lit);
         }
         else if(((int)nCurrentKFid-(int)pMP->mnFirstKFid)>=3)
@@ -641,9 +641,9 @@ cv::Mat LocalMapping::ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)
 // 外部线程调用,请求停止当前线程的工作; 其实是回环检测线程调用,来避免在进行全局优化的过程中局部建图线程添加新的关键帧
 void LocalMapping::RequestStop()
 {
-    unique_lock<mutex> lock(mMutexStop, std::defer_lock);
+    unique_lock<mutex> lock1(mMutexStop, std::defer_lock);
     unique_lock<mutex> lock2(mMutexNewKFs, std::defer_lock);
-    std::lock(lock, lock2);
+    std::lock(lock1, lock2);
     mbStopRequested = true;
     mbAbortBA = true;
 }
