@@ -38,25 +38,24 @@ namespace ORB_SLAM2
 
 // 构造函数
 LocalMapping::LocalMapping(Map *pMap, bool bMonocular):
-    mbResetRequested(false),
-    mbFinishRequested(false),
-    mbFinished(true),
-    mpMap(pMap),
-    mbAbortBA(false),
-    mbStopped(false),
-    mbStopRequested(false),
-    mbNotStop(false),
-    mbAcceptKeyFrames(true),
-    mpLoopCloser(nullptr),
-    mpTracker(nullptr),
-    mpCurrentKeyFrame(nullptr)
+  mbResetRequested(false),
+  mbFinishRequested(false),
+  mbFinished(true),
+  mpMap(pMap),
+  mbAbortLocalBARequested(false),
+  mbStopped(false),
+  mbStopRequested(false),
+  mbAcceptKeyFrames(true),
+  mpLoopCloser(nullptr),
+  mpTracker(nullptr),
+  mpCurrentKeyFrame(nullptr)
 {
     /*
-     * mbStopRequested：    外部线程调用，为true，表示外部线程请求停止 local mapping
-     * mbStopped：          为true表示可以并终止localmapping 线程
-     * mbNotStop：          true，表示不要停止 localmapping 线程，因为要插入关键帧了。需要和 mbStopped 结合使用
+     * mbResetRequested：    外部线程调用，为true，表示外部线程请求停止 local mapping
+     * mbReset：          为true表示可以并终止localmapping 线程
+     * mbNotStop：          true，表示不要停止 localmapping 线程，因为要插入关键帧了。需要和 mbReset 结合使用
      * mbAcceptKeyFrames：  true，允许接受关键帧。tracking 和local mapping 之间的关键帧调度
-     * mbAbortBA：          是否流产BA优化的标志位
+     * mbAbortLocalBARequested：          是否流产BA优化的标志位
      * mbFinishRequested：  请求终止当前线程的标志。注意只是请求，不一定终止。终止要看 mbFinished
      * mbResetRequested：   请求当前线程复位的标志。true，表示一直请求复位，但复位还未完成；表示复位完成为false
      * mbFinished：         判断最终LocalMapping::Run() 是否完成的标志。
@@ -78,11 +77,9 @@ void LocalMapping::SetTracker(Tracking *pTracker)
 // 线程主函数
 void LocalMapping::Run()
 {
-
     // 标记状态，表示当前run函数正在运行，尚未结束
     mbFinished = false;
-    // 主循环
-    while(1)
+    while(!mbFinishRequested)
     {
         // Step 1 告诉Tracking，LocalMapping正处于繁忙状态，请不要给我发送关键帧打扰我
         // LocalMapping线程处理的关键帧都是Tracking线程发来的
@@ -115,16 +112,16 @@ void LocalMapping::Run()
             }
 
             // 终止BA的标志
-            mbAbortBA = false;
+            mbAbortLocalBARequested = false;
 
             // 已经处理完队列中的最后的一个关键帧，并且闭环检测没有请求停止LocalMapping
-            if(!CheckNewKeyFrames() && !stopRequested())
+            if(!CheckNewKeyFrames() && !isStopRequested())
             {
                 // Local BA
                 // Step 6 当局部地图中的关键帧大于2个的时候进行局部地图的BA
                 if(mpMap->KeyFramesInMap() > 2)
                     // 我们认为位姿是准确的，不需要优化（只在回环检测时优化位姿）
-                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortBA, mpMap, true);
+                    Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame, &mbAbortLocalBARequested, mpMap, true);
 
                 // Check redundant local Keyframes
                 // Step 7 检测并剔除当前帧相邻的关键帧中冗余的关键帧
@@ -135,35 +132,29 @@ void LocalMapping::Run()
             // Step 8 将当前帧加入到闭环检测队列中（相邻关键帧可能被 KeyFrameCulling 设置位Bad）
             mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
         }
-        else if(Stop()) // 当要终止当前线程的时候
+
+        // 当要终止当前线程的时候
+        if(isStopRequested() && !CheckNewKeyFrames())
         {
-            // Safe area to stop
-            while(isStopped() && !CheckFinish())
-            {
-                // 如果还没有结束利索,那么等
-                // usleep(3000);
+            mbStopped = true;
+            LOG(INFO) << "LocalMapping is Stopped...";
+            while(isStopRequested() && !mbFinishRequested)
                 std::this_thread::sleep_for(std::chrono::milliseconds(3));
-            }
-            // 然后确定终止了就跳出这个线程的主循环
-            if(CheckFinish())
-                break;
+            mbStopped = false;
+            LOG(INFO) << "LocalMapping is Resumed (Not Stopped)...";
         }
 
         // 查看是否有复位线程的请求
-        ResetIfRequested();
+        TryResetIfRequested();
 
         // Tracking will see that Local Mapping is not busy
         SetAcceptKeyFrames(true);
 
-        // 如果当前线程已经结束了就跳出主循环
-        if(CheckFinish())
-            break;
-
         std::this_thread::sleep_for(std::chrono::milliseconds(3));
     }
-
     // 设置线程已经终止
-    SetFinish();
+    mbStopped = true;
+    mbFinished = true;
 }
 
 // 插入关键帧,由外部（Tracking）线程调用;这里只是插入到列表中,等待线程主函数对其进行处理
@@ -172,7 +163,7 @@ void LocalMapping::InsertKeyFrame(KeyFrame *pKF)
     unique_lock<mutex> lock(mMutexNewKFs);
     // 将关键帧插入到列表中
     mlNewKeyFrames.push_back(pKF);
-    mbAbortBA=true;
+    mbAbortLocalBARequested=true;
 }
 
 // 查看列表中是否有等待被插入的关键帧,
@@ -231,13 +222,13 @@ void LocalMapping::MapPointCulling()
             // Step 2.1：已经是坏点的地图点仅从队列中删除
             lit = mlpRecentAddedMapPoints.erase(lit);
         }
-        else if(pMP->GetFoundRatio()<0.25f)
+        else if(pMP->GetMatchedRatio() < 0.25f)
         {
             // Step 2.2：跟踪到该地图点的帧数相比预计可观测到该地图点的帧数的比例小于25%，从地图中删除
-            // (mnFound/mnVisible） < 25%
-            // mnFound ：地图点被多少帧（包括普通帧）看到，次数越多越好
+            // (mnMatched/mnVisible） < 25%
+            // mnMatched ：地图点被多少帧（包括普通帧）看到，次数越多越好
             // mnVisible：地图点应该被看到的次数
-            // (mnFound/mnVisible）：对于大FOV镜头这个比例会高，对于窄FOV镜头这个比例会低
+            // (mnMatched/mnVisible）：对于大FOV镜头这个比例会高，对于窄FOV镜头这个比例会低
           pMP->EraseAndSetBad();
             lit = mlpRecentAddedMapPoints.erase(lit);
         }
@@ -641,48 +632,26 @@ cv::Mat LocalMapping::ComputeF12(KeyFrame *&pKF1, KeyFrame *&pKF2)
 // 外部线程调用,请求停止当前线程的工作; 其实是回环检测线程调用,来避免在进行全局优化的过程中局部建图线程添加新的关键帧
 void LocalMapping::RequestStop()
 {
-    unique_lock<mutex> lock1(mMutexStop, std::defer_lock);
-    unique_lock<mutex> lock2(mMutexNewKFs, std::defer_lock);
-    std::lock(lock1, lock2);
     mbStopRequested = true;
-    mbAbortBA = true;
+    mbAbortLocalBARequested = true;
+    LOG(INFO) << "Local Mapping RequestStop()!";
 }
 
-// 检查是否要把当前的局部建图线程停止工作,运行的时候要检查是否有终止请求,如果有就执行. 由run函数调用
-bool LocalMapping::Stop()
-{
-    unique_lock<mutex> lock(mMutexStop);
-    // 如果当前线程还没有准备停止,但是已经有终止请求了,那么就准备停止当前线程
-    if(mbStopRequested && !mbNotStop)
-    {
-        mbStopped = true;
-        LOG(INFO) << "Local Mapping STOP" << '\n';
-        return true;
-    }
-    return false;
-}
 
-// 检查mbStopped是否为true，为true表示可以并终止localmapping 线程
 bool LocalMapping::isStopped()
 {
-    unique_lock<mutex> lock(mMutexStop);
     return mbStopped;
 }
 
-// 求外部线程调用，为true，表示外部线程请求停止 local mapping
-bool LocalMapping::stopRequested()
+
+bool LocalMapping::isStopRequested()
 {
-    unique_lock<mutex> lock(mMutexStop);
     return mbStopRequested;
 }
 
 // 释放当前还在缓冲区中的关键帧指针
-void LocalMapping::Release()
+void LocalMapping::ClearRequestStop()
 {
-    unique_lock<mutex> lock(mMutexStop, std::defer_lock);
-    unique_lock<mutex> lock2(mMutexFinish, std::defer_lock);
-    std::lock(lock, lock2);
-
     if(mbFinished)
         return;
     mbStopped = false;
@@ -690,45 +659,26 @@ void LocalMapping::Release()
     for(KeyFrame* pKF : mlNewKeyFrames)
         delete pKF;
     mlNewKeyFrames.clear();
-
-    LOG(INFO) << "Local Mapping RELEASE" << '\n';
+    LOG(INFO) << "Local Mapping ClearRequestStop()!" << '\n';
 }
 
 // 查看当前是否允许接受关键帧
 bool LocalMapping::AcceptKeyFrames()
 {
-    unique_lock<mutex> lock(mMutexAccept);
     return mbAcceptKeyFrames;
 }
 
 // 设置"允许接受关键帧"的状态标志
 void LocalMapping::SetAcceptKeyFrames(bool flag)
 {
-    unique_lock<mutex> lock(mMutexAccept);
     mbAcceptKeyFrames=flag;
 }
 
-// 设置 mbnotStop标志的状态
-bool LocalMapping::SetNotStop(bool flag)
-{
-    unique_lock<mutex> lock(mMutexStop);
-
-    // 已经处于!flag的状态了
-    // 就是我希望线程先不要停止,但是经过检查这个时候线程已经停止了...
-    if(flag && mbStopped)
-        //设置失败
-        return false;
-
-    //设置为要设置的状态
-    mbNotStop = flag;
-    //设置成功
-    return true;
-}
 
 // 终止BA
-void LocalMapping::InterruptBA()
+void LocalMapping::InterruptLocalBA()
 {
-    mbAbortBA = true;
+  mbAbortLocalBARequested = true;
 }
 
 /**
@@ -834,30 +784,16 @@ cv::Mat LocalMapping::SkewSymmetricMatrix(const cv::Mat &v)
 // 请求当前线程复位,由外部线程调用,堵塞的
 void LocalMapping::RequestReset()
 {
-    {
-        unique_lock<mutex> lock(mMutexReset);
-        mbResetRequested = true;
-    }
-
+    mbResetRequested = true;
     // 一直等到局部建图线程响应之后才可以退出
-    while(1)
-    {
-        {
-            unique_lock<mutex> lock2(mMutexReset);
-            if(!mbResetRequested)
-                break;
-        }
-        //usleep(3000);
+    while (mbResetRequested)
         std::this_thread::sleep_for(std::chrono::milliseconds(3));
-    }
 }
 
 // 检查是否有复位线程的请求
-void LocalMapping::ResetIfRequested()
+void LocalMapping::TryResetIfRequested()
 {
-    unique_lock<mutex> lock(mMutexReset);
-    // 执行复位操作:清空关键帧缓冲区,清空待cull的地图点缓冲
-    
+    // 执行复位操作：清空关键帧缓冲区，清空待cull的地图点缓冲
     if(mbResetRequested)
     {
         mlNewKeyFrames.clear();
@@ -870,31 +806,12 @@ void LocalMapping::ResetIfRequested()
 // 请求终止当前线程
 void LocalMapping::RequestFinish()
 {
-    unique_lock<mutex> lock(mMutexFinish);
     mbFinishRequested = true;
-}
-
-// 检查是否已经有外部线程请求终止当前线程
-bool LocalMapping::CheckFinish()
-{
-    unique_lock<mutex> lock(mMutexFinish);
-    return mbFinishRequested;
-}
-
-// 设置当前线程已经真正地结束了
-void LocalMapping::SetFinish()
-{
-    unique_lock<mutex> lock(mMutexFinish, std::defer_lock);
-    unique_lock<mutex> lock2(mMutexStop, std::defer_lock);
-    std::lock(lock, lock2);
-    mbFinished = true;    // 线程已经被结束
-    mbStopped = true;     // 既然已经都结束了,那么当前线程也已经停止工作了
 }
 
 // 当前线程的run函数是否已经终止
 bool LocalMapping::isFinished()
 {
-    unique_lock<mutex> lock(mMutexFinish);
     return mbFinished;
 }
 

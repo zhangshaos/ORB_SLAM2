@@ -145,11 +145,11 @@ public:
     // 保存了最初始的关键帧
     std::vector<KeyFrame*> mvpKeyFrameOrigins;
 
-    // 当更新地图时的互斥量.回环检测中和局部BA后更新全局地图的时候会用到这个
-    std::mutex mMutexMapUpdate;
+    // 当更新地图时的互斥量。
+    // 回环检测or局部建图->局部BA两个线程更新全局地图的时候会用到这个。
+    std::mutex mMutexUpdateMap;
 
-    // This avoid that two points are created simultaneously in separate threads (id conflict)
-    // 为了避免地图点id冲突设计的互斥量
+    // 为了避免地图点id冲突设计的互斥量，因为地图点可以被Tracking和LocalMapping两个线程所创建
     std::mutex mMutexPointCreation;
 
 protected:

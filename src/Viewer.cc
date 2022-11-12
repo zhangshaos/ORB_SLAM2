@@ -22,6 +22,7 @@
 #include <mutex>
 
 #include <pangolin/pangolin.h>
+#include <glog/logging.h>
 
 #include "Frame.h"
 #include "FrameDrawer.h"
@@ -49,8 +50,7 @@ Viewer::Viewer(System* pSystem,
   mpTracker(pTracking),
   mbFinishRequested(false),
   mbFinished(true),
-  mbStopped(false),
-  mbStopRequested(false)
+  mbResetRequested(false)
 {
   //从文件中读取相机的帧频
   cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
@@ -58,7 +58,7 @@ Viewer::Viewer(System* pSystem,
   float fps = fSettings["Camera.fps"];
   if(fps<1)
     fps=30;
-  // 计算出每一帧所持续的时间
+  //计算出每一帧所持续的时间
   mT = 1e3/fps;
 
   //从配置文件中获取图像的长宽参数
@@ -86,7 +86,9 @@ void Viewer::Run()
   // 这个变量配合SetFinish函数用于指示该函数是否执行完毕
   mbFinished = false;
 
-  pangolin::CreateWindowAndBind("ORB-SLAM2: Map Viewer",MaxViewerWidth,MaxViewerHeight);
+  pangolin::CreateWindowAndBind("ORB-SLAM2: Map Viewer",
+                                Viewer::MaxViewerWidth,
+                                Viewer::MaxViewerHeight);
 
   // 3D Mouse handler requires depth testing to be enabled
   // 启动深度测试，OpenGL只绘制最前面的一层，绘制时检查当前像素前面是否有别的像素，如果别的像素挡住了它，那它就不会绘制
@@ -123,9 +125,10 @@ void Viewer::Run()
   // 前两个参数（0.0, 1.0）表明宽度和面板纵向宽度和窗口大小相同
   // 中间两个参数（pangolin::Attach::Pix(175), 1.0）表明右边所有部分用于显示图形
   // 最后一个参数（-MaxViewerWidth/MaxViewerHeight）为显示长宽比
+  pangolin::Handler3D handler3D(s_cam);
   pangolin::View& d_cam = pangolin::CreateDisplay()
     .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -(float)MaxViewerWidth/(float)MaxViewerHeight)
-    .SetHandler(new pangolin::Handler3D(s_cam));
+    .SetHandler(&handler3D);
 
   // 创建一个欧式变换矩阵,存储当前的相机位姿
   pangolin::OpenGlMatrix Twc;
@@ -138,8 +141,16 @@ void Viewer::Run()
   bool bFollow = true;
 
   // 更新绘制的内容
-  while(1)
+  while (!mbFinishRequested)
   {
+    while (mbResetRequested)
+      // 等待其他线程重置状态，因为渲染线程依赖会访问其他线程的数据，
+      // 如果其他线程在重置时被访问，可能访问不存在数据。
+      this_thread::sleep_for(chrono::milliseconds(10));
+
+    // 记录渲染耗时
+    auto t0 = chrono::steady_clock::now();
+
     // 清除缓冲区中的当前可写的颜色缓冲 和 深度缓冲
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -208,95 +219,41 @@ void Viewer::Run()
       menuReset = false;
     }
 
-    // 如果有停止更新的请求
-    if(Stop())
-    {
-      // 就不再绘图了,并且在这里每隔三秒检查一下是否结束
-      while(isStopped())
-      {
-        std::this_thread::sleep_for(std::chrono::milliseconds(3));
-      }
-    }
-
-    // 满足的时候退出这个线程循环,这里应该是查看终止请求
-    if(CheckFinish())
-      break;
+    // 计算渲染耗时
+    auto t1 = chrono::steady_clock::now();
+    lastRenderingMilliseconds =
+      chrono::duration_cast<chrono::milliseconds>(t1-t0).count();
   }
 
-  // 销毁之前创建的 cv 窗口
+  // 销毁之前创建的窗口
   cv::destroyAllWindows();
 
-  // 终止查看器,主要是设置状态,执行完成退出这个函数后,查看器进程就已经被销毁了
-  SetFinish();
+  // 执行完成退出这个函数后,查看器进程就已经被销毁了
+  mbFinished = true;
 }
 
 //外部函数调用,用来请求当前进程结束
 void Viewer::RequestFinish()
 {
-  unique_lock<mutex> lock(mMutexFinish);
   mbFinishRequested = true;
-}
-
-//检查是否有结束当前进程的请求
-bool Viewer::CheckFinish()
-{
-  unique_lock<mutex> lock(mMutexFinish);
-  return mbFinishRequested;
-}
-
-//设置变量:当前进程已经结束
-void Viewer::SetFinish()
-{
-  unique_lock<mutex> lock(mMutexFinish);
-  mbFinished = true;
 }
 
 //判断当前进程是否已经结束
 bool Viewer::isFinished()
 {
-  unique_lock<mutex> lock(mMutexFinish);
   return mbFinished;
 }
 
-//请求当前查看器停止更新
-void Viewer::RequestStop()
+//外部线程请求当前查看器停止更新
+void Viewer::RequestReset()
 {
-  unique_lock<mutex> lock(mMutexStop);
-  if(!mbStopped)
-    mbStopRequested = true;
+  mbResetRequested = true;
+  this_thread::sleep_for(chrono::milliseconds(3*lastRenderingMilliseconds));
 }
 
-//查看当前查看器是否已经停止更新
-bool Viewer::isStopped()
+void Viewer::RequestResetOver()
 {
-  unique_lock<mutex> lock(mMutexStop);
-  return mbStopped;
+  mbResetRequested = false;
 }
-
-//当前查看器停止更新
-bool Viewer::Stop()
-{
-  unique_lock<mutex> lock1(mMutexStop, std::defer_lock);
-  unique_lock<mutex> lock2(mMutexFinish, std::defer_lock);
-  std::lock(lock1, lock2);
-
-  if(mbFinishRequested)
-    return false;
-  else if(mbStopRequested)
-  {
-    mbStopped = true;
-    mbStopRequested = false;
-    return true;
-  }
-  return false;
-}
-
-//释放查看器进程,因为如果停止查看器的话,查看器进程会处于死循环状态.这个就是为了释放那个标志
-void Viewer::Release()
-{
-  unique_lock<mutex> lock(mMutexStop);
-  mbStopped = false;
-}
-
 
 } // Namespace ORB_SLAM2

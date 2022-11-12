@@ -59,7 +59,7 @@ MapPoint::MapPoint(const cv::Mat &Pos,  //地图点的世界坐标
     mnBAGlobalForKF(0),                     //
     mpRefKF(pRefKF),                        //
     mnVisible(1),                           //在帧中的可视次数
-    mnFound(1),                             //被找到的次数 和上面的相比要求能够匹配上
+    mnMatched(1),                             //被找到的次数 和上面的相比要求能够匹配上
     mbBad(false),                           //坏点标记
     mpReplaced(nullptr),                    //替换掉当前地图点的点
     mfMinDistance(0),                       //当前地图点在某帧下,可信赖的被找到时其到关键帧光心距离的下界
@@ -103,7 +103,7 @@ MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF
   mnBAGlobalForKF(0),
   mpRefKF(nullptr),
   mnVisible(1),
-  mnFound(1),
+  mnMatched(1),
   mbBad(false),
   mpReplaced(nullptr),
   mpMap(pMap),
@@ -137,7 +137,6 @@ MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF
     pFrame->mDescriptors.row(idxF).copyTo(mDescriptor);
 
     // MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
-    //? 不太懂,怎么个冲突法?
     unique_lock<mutex> lock(mpMap->mMutexPointCreation);
     mnId = nNextId++;
 }
@@ -298,7 +297,7 @@ void MapPoint::Replace(MapPoint* pMP)
         mbBad=true;
         //暂存当前地图点的可视次数和被找到的次数
         nvisible = mnVisible;
-        nfound = mnFound;
+        nfound = mnMatched;
         //指明当前地图点已经被指定的地图点替换了
         mpReplaced = pMP;
     }
@@ -326,7 +325,7 @@ void MapPoint::Replace(MapPoint* pMP)
     }
 
     //- 将当前地图点的观测数据等其他数据都"叠加"到新的地图点上
-    pMP->IncreaseFound(nfound);
+    pMP->IncreaseMatched(nfound);
     pMP->IncreaseVisible(nvisible);
     //描述子更新
     pMP->ComputeDistinctiveDescriptors();
@@ -365,17 +364,17 @@ void MapPoint::IncreaseVisible(int n)
  * 能找到该点的帧数+n，n默认为1
  * @see Tracking::TrackLocalMap()
  */
-void MapPoint::IncreaseFound(int n)
+void MapPoint::IncreaseMatched(int n)
 {
     unique_lock<mutex> lock(mMutexFeatures);
-    mnFound += n;
+  mnMatched += n;
 }
 
 // 计算被找到的比例
-float MapPoint::GetFoundRatio()
+float MapPoint::GetMatchedRatio()
 {
     unique_lock<mutex> lock(mMutexFeatures);
-    return float(mnFound) / mnVisible;
+    return float(mnMatched) / mnVisible;
 }
 
 /**

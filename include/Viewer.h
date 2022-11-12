@@ -61,10 +61,16 @@ public:
   void RequestFinish();
 
   /**
-   * @brief 请求当前可视化进程暂停更新图像数据
+   * @brief 请求重置更新图像数据，即暂停渲染
    *
    */
-  void RequestStop();
+  void RequestReset();
+
+  /**
+   * @brief 请求恢复渲染，从暂停（重置）中恢复出来
+   *
+   */
+  void RequestResetOver();
 
   /**
    * @brief 当前是否有停止当前进程的请求
@@ -72,30 +78,10 @@ public:
    */
   bool isFinished();
 
-  /**
-   * @brief 判断当前进程是否已经停止
-   *
-   */
-  bool isStopped();
-
-  /**
-   * @brief 释放变量，避免互斥关系
-   *
-   */
-  void Release();
-
   // UI窗口的最大高度和宽度
   static const int MaxViewerHeight, MaxViewerWidth;
+
 private:
-
-  /**
-   * @brief 停止当前查看器的更新
-   *
-   * @return true     成功停止
-   * @return false    失败,一般是因为查看器进程已经销毁或者是正在销毁
-   */
-  bool Stop();
-
   //系统对象指针
   System* mpSystem;
   //帧绘制器
@@ -116,34 +102,15 @@ private:
   float mCameraFocal;
   // 坐标系放缩，太大的坐标系在屏幕上显示不出来
   float mCoordinateScale;
-
-  /**
-   * @brief 检查当前查看器进程是否已经终止
-   *
-   * @return true
-   * @return false
-   */
-  bool CheckFinish();
-  /**
-   * @brief 设置当前线程终止
-   *
-   */
-  void SetFinish();
+  // 记录上一帧渲染花费的时间（毫秒）
+  unsigned long long lastRenderingMilliseconds;
 
   // 请求结束当前线程的标志
   bool mbFinishRequested;
   // 当前线程是否已经终止
   bool mbFinished;
-  // 线程锁对象,用于锁住和finsh,终止当前查看器进程相关的变量
-  std::mutex mMutexFinish;
-
-  // 当前进程是否停止
-  bool mbStopped;
-  // 是否头停止请求
-  bool mbStopRequested;
-  // 用于锁住stop,停止更新变量相关的互斥量
-  std::mutex mMutexStop;
-
+  // 是否有重置请求
+  bool mbResetRequested;
 };
 
 } // Namespace ORB_SLAM2

@@ -155,6 +155,7 @@ int Main(int argc, char* argv[])
   // Stop all threads
   slamSystem.Shutdown();
   slamSystem.SaveMap("../../Examples/Monocular/Out/Map.ply", &revertM);
+  LOG(INFO) << "Corrected Exit!";
   return 0;
 }
 
@@ -178,5 +179,6 @@ int main(int argc, char* argv[])
   {
     LOG(ERROR) << "Unknown exception.";
   }
+  LOG(INFO) << "Truly Corrected Exit!!!";
   return r;
 }

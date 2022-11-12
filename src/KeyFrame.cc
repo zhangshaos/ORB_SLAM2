@@ -639,7 +639,6 @@ void KeyFrame::EraseAndSetBad()
     unique_lock<mutex> lock1(mMutexConnections, std::defer_lock);
     unique_lock<mutex> lock2(mMutexFeatures, std::defer_lock); // 防止更新当前帧的connection
     std::lock(lock1, lock2);
-    // todo：找到所有 bug 标记的位置
 
     // 清空自己与其它关键帧之间的联系
     mConnectedKeyFrameWeights.clear();

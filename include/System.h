@@ -49,6 +49,8 @@ public:
            const string &strSettingsFile,       //指定配置文件的路径
            bool bUseViewer = true);       //指定是否使用可视化界面
 
+    ~System();
+
     /**
      * 给定输入
      *
@@ -82,14 +84,13 @@ public:
      * @return
      */
     bool SaveMap(const string &filename, const Sophus::SE3d *revertTransform=nullptr);
-    //bool LoadMap(const string &filename);
+    // bool LoadMap(const string &filename);
 
-    // Information from most recent processed frame
-    // You can call this right after TrackMonocular (or stereo or RGBD)
     // 获取最近的运动追踪状态、地图点追踪状态、特征点追踪状态
     int GetTrackingState();
     std::vector<MapPoint*> GetTrackedMapPoints();
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
+
     // 保存最近成功追踪到的地图点
     bool SaveTrackedMap(const std::string &filePath);
 
@@ -99,62 +100,58 @@ protected:
 
     // ORB vocabulary used for place recognition and feature matching.
     // 一个指针指向ORB字典
-    ORBVocabulary* mpVocabulary;
+    ORBVocabulary* mpVocabulary{ nullptr };
 
     // KeyFrame database for place recognition (relocalization and loop detection).
     // 关键帧数据库的指针，这个数据库用于重定位和回环检测
-    KeyFrameDatabase* mpKeyFrameDatabase;
+    KeyFrameDatabase* mpKeyFrameDatabase{ nullptr };
 
-    //指向地图（数据库）的指针
+    // 指向地图（数据库）的指针
     // Map structure that stores the pointers to all KeyFrames and MapPoints.
-    Map* mpMap;
+    Map* mpMap{ nullptr };
 
     // Tracker. It receives a frame and computes the associated camera pose.
     // It also decides when to insert a new keyframe, create some new MapPoints and
     // performs relocalization if tracking fails.
     // 追踪器，除了进行运动追踪外还要负责创建关键帧、创建新地图点和进行重定位的工作。详细信息还得看相关文件
-    Tracking* mpTracker;
+    Tracking* mpTracker{ nullptr };
 
     // Local Mapper. It manages the local map and performs local bundle adjustment.
-    //局部建图器。局部BA由它进行。
-    LocalMapping* mpLocalMapper;
+    // 局部建图器。局部BA由它进行。
+    LocalMapping* mpLocalMapper{ nullptr };
 
     // Loop Closer. It searches loops with every new keyframe. If there is a loop it performs
     // a pose graph optimization and full bundle adjustment (in a new thread) afterwards.
     // 回环检测器，它会执行位姿图优化并且开一个新的线程进行全局BA
-    LoopClosing* mpLoopCloser;
+    LoopClosing* mpLoopCloser{ nullptr };
 
     // The viewer draws the map and the current camera pose. It uses Pangolin.
     // 查看器，可视化 界面
-    Viewer* mpViewer;
-
-    //帧绘制器
-    FrameDrawer* mpFrameDrawer;
-    //地图绘制器
-    MapDrawer* mpMapDrawer;
+    Viewer* mpViewer{ nullptr };
+    // 帧绘制器
+    FrameDrawer* mpFrameDrawer{ nullptr };
+    // 地图绘制器
+    MapDrawer* mpMapDrawer{ nullptr };
 
 
     // System threads: Local Mapping, Loop Closing, Viewer.
     // The Tracking thread "lives" in the main execution thread that creates the System object.
-    //系统除了在主进程中进行运动追踪工作外，会创建局部建图线程、回环检测线程和查看器线程。
-    std::thread* mptLocalMapping;
-    std::thread* mptLoopClosing;
-    std::thread* mptViewer;
+    // 系统除了在主进程中进行运动追踪工作外，会创建局部建图线程、回环检测线程和查看器线程。
+    std::thread mtLocalMapping;
+    std::thread mtLoopClosing;
+    std::thread mtViewer;
 
     // Reset flag
-    //复位标志，注意这里目前还不清楚为什么要定义为std::mutex类型
-    std::mutex mMutexReset;
-    bool mbReset;
+    bool mbReset{ false };
 
     // Tracking state
     // 追踪状态标志，注意前三个的类型和上面的函数类型相互对应
     int mTrackingState;
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
-    std::mutex mMutexState;
 
     // 存储当前系统输入位姿
-    Sophus::SE3d mInPoseTcw;
+    Sophus::SE3d mInPoseTcw{ Sophus::Matrix4d::Identity() };
     // 存储当前系统输入图片
     cv::Mat mInImage;
     // 存储当前输入图片文件名

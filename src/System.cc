@@ -47,10 +47,8 @@ namespace ORB_SLAM2
 //系统的构造函数，将会启动其他的线程
 System::System(const string &strVocFile,				//词典文件路径
 			         const string &strSettingsFile,   //配置文件路径
-               bool bUseViewer):					//是否使用可视化界面
-         mpViewer(nullptr),		                  //
-         mbReset(false),  						          //无复位标志
-         mTrackingState(Tracking::State::SYSTEM_NOT_READY)
+               bool bUseViewer) 					      //是否使用可视化界面
+               : mTrackingState{Tracking::State::SYSTEM_NOT_READY}
 {
     // Check settings file
     cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
@@ -96,24 +94,32 @@ System::System(const string &strVocFile,				//词典文件路径
 
     // 初始化局部建图线程并运行
     mpLocalMapper = new LocalMapping(mpMap, true);
-    mptLocalMapping = new std::thread(&ORB_SLAM2::LocalMapping::Run, mpLocalMapper);
+    {
+        std::thread localMapping(&ORB_SLAM2::LocalMapping::Run, mpLocalMapper);
+        mtLocalMapping.swap(localMapping);
+    }
 
     // 初始化回环检测线程并运行
     mpLoopCloser = new LoopClosing(mpMap, 						  //地图
                                    mpKeyFrameDatabase, 	//关键帧数据库
-                                   mpVocabulary 				//ORB字典
-                                   );
-    mptLoopClosing = new std::thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
+                                   mpVocabulary);       //ORB词典
+    {
+        std::thread loopClosing(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
+        mtLoopClosing.swap(loopClosing);
+    }
 
     // 初始化可视化线程并执行
     if(bUseViewer)
     {
         mpViewer = new Viewer(this,
-        					  mpFrameDrawer,	  //帧绘制器
-        					  mpMapDrawer,		  //地图绘制器
-        					  mpTracker,		    //追踪器
-        					  strSettingsFile);	//配置文件的访问路径
-        mptViewer = new std::thread(&Viewer::Run, mpViewer);
+        					            mpFrameDrawer,	  //帧绘制器
+        					            mpMapDrawer,		  //地图绘制器
+        					            mpTracker,		    //追踪器
+                              strSettingsFile);	//配置文件的访问路径
+        {
+            std::thread viewer(&Viewer::Run, mpViewer);
+            mtViewer.swap(viewer);
+        }
         mpTracker->SetViewer(mpViewer);
     }
 
@@ -127,6 +133,19 @@ System::System(const string &strVocFile,				//词典文件路径
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
 }
 
+
+System::~System()
+{
+    delete mpVocabulary;
+    delete mpKeyFrameDatabase;
+    delete mpMap;
+    delete mpTracker;
+    delete mpLocalMapper;
+    delete mpLoopCloser;
+    delete mpFrameDrawer;
+    delete mpMapDrawer;
+    delete mpViewer;
+}
 
 
 //判断是否地图有较大的改变
@@ -147,34 +166,27 @@ bool System::MapChanged()
 //准备执行复位
 void System::Reset()
 {
-    unique_lock<mutex> lock(mMutexReset);
     mbReset = true;
 }
 
 //退出
 void System::Shutdown()
 {
-	//对局部建图线程和回环检测线程发送终止请求
+	  //对局部建图线程和回环检测线程发送终止请求
     mpLocalMapper->RequestFinish();
     mpLoopCloser->RequestFinish();
-    //如果使用了可视化窗口查看器
     if(mpViewer)
     {
-    	//向查看器发送终止请求
         mpViewer->RequestFinish();
-        //等到，知道真正地停止
         while(!mpViewer->isFinished())
-            this_thread::sleep_for(5000us);
+            this_thread::sleep_for(5ms);
     }
-
-    // Wait until all thread have effectively stopped
-    while(!mpLocalMapper->isFinished() || 
-    	  !mpLoopCloser->isFinished()  || 
-    	   mpLoopCloser->isRunningGBA())			
+    while(!mpLocalMapper->isFinished() ||
+    	    !mpLoopCloser->isFinished()  ||
+          mpLoopCloser->isRunningGBA())
     {
-        this_thread::sleep_for(5000us);
+        this_thread::sleep_for(5ms);
     }
-
     if(mpViewer)
         pangolin::BindToContext("ORB-SLAM2: Map Viewer");
 }
@@ -182,21 +194,18 @@ void System::Shutdown()
 //获取追踪器状态
 int System::GetTrackingState()
 {
-    unique_lock<mutex> lock(mMutexState);
     return mTrackingState;
 }
 
 //获取追踪到的地图点（其实实际上得到的是一个指针）
 vector<MapPoint*> System::GetTrackedMapPoints()
 {
-    unique_lock<mutex> lock(mMutexState);
     return mTrackedMapPoints;
 }
 
 //获取追踪到的关键帧的点
 vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
 {
-    unique_lock<mutex> lock(mMutexState);
     return mTrackedKeyPointsUn;
 }
 
@@ -237,19 +246,14 @@ int System::TrackMonocularWithPose(const cv::Mat &im, double timestamp,
   mInImageName = imName;
 
   // Check reset
+  if(mbReset)
   {
-    unique_lock<mutex> lock(mMutexReset);
-    if(mbReset)
-    {
-      mpTracker->Reset();
-      mbReset = false;
-    }
+    mpTracker->Reset();
+    mbReset = false;
   }
 
   // 获取相机位姿的估计结果
   auto state = mpTracker->trackImageWithPose(im, timestamp, Converter::toCvMat(poseTcw), imName.c_str());
-
-  unique_lock<mutex> lock(mMutexState);
   mTrackingState = state;
   mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
   mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
@@ -278,13 +282,11 @@ bool System::SaveTrackedMap(const std::string &filePath)
   const size_t N = keyPoints.size();
   for (size_t i=0; i<N; ++i)
   {
-    MapPoint* mpt = mapPoints[i];
+    MapPoint* p = mapPoints[i];
     const cv::KeyPoint& kpt = keyPoints[i];
-    if (mpt && !mpt->isBad())
+    if (p && !p->isBad())
     {
-      // todo: 对地图点点进行筛选
-      int nFound = mpt->GetFound();
-      Eigen::Vector3d wPos = Converter::toVector3d(mpt->GetWorldPos());
+      Eigen::Vector3d wPos = Converter::toVector3d(p->GetWorldPos());
       Eigen::Vector3d camPos = mInPoseTcw * wPos;
       vertexesPos.emplace_back(std::array<double,3>{ camPos.x(), camPos.y(), camPos.z() });
       vertexesPtX.emplace_back(kpt.pt.x);

@@ -69,9 +69,8 @@ void Map::EraseMapPoint(MapPoint *pMP)
 
   // 下面是作者加入的注释. 实际上只是从std::set中删除了地图点的指针, 原先地图点
   // 占用的内存区域并没有得到释放
-  // TODO: This only erase the pointer.
+  // TODO: 解决MapPoint的内存泄漏问题（只new不delete）
   // Delete the MapPoint
-  // delete pMP;
 }
 
 /**
@@ -84,9 +83,8 @@ void Map::EraseKeyFrame(KeyFrame *pKF)
   // 是的,根据值来删除地图点
   mspKeyFrames.erase(pKF);
 
-  // TODO: This only erase the pointer.
+  // TODO: 解决KeyFrame的内存泄漏问题（只new不delete）
   // Delete the MapPoint
-  // delete pKF;
 }
 
 /*

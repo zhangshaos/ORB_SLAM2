@@ -57,7 +57,7 @@ public:
   typedef std::map<KeyFrame*,                  //键
                    g2o::Sim3,                  //值
                    std::less<KeyFrame*>,       //排序算法
-                   Eigen::aligned_allocator<std::pair<KeyFrame *const, g2o::Sim3>> // 指定分配器,和内存空间开辟有关. 为了能够使用Eigen库中的SSE和AVX指令集加速,需要将传统STL容器中的数据进行对齐处理
+                   Eigen::aligned_allocator<std::pair<KeyFrame *const, g2o::Sim3> > // 指定分配器,和内存空间开辟有关. 为了能够使用Eigen库中的SSE和AVX指令集加速,需要将传统STL容器中的数据进行对齐处理
                   > KeyFrameAndPose;
 
 public:
@@ -108,14 +108,7 @@ public:
   // 在回环纠正的时候调用,查看当前是否已经有一个全局优化的线程在进行
   bool isRunningGBA()
   {
-    unique_lock<std::mutex> lock(mMutexGBA);
     return mbRunningGBA;
-  }
-
-  bool isFinishedGBA()
-  {
-    unique_lock<std::mutex> lock(mMutexGBA);
-    return mbFinishedGBA;
   }
 
   /**
@@ -179,34 +172,16 @@ protected:
    * @brief  当前线程调用,检查是否有外部线程请求复位当前线程,如果有的话就复位回环检测线程
    *
    */
-  void ResetIfRequested();
+  void TryResetIfRequested();
 
   // 是否有复位当前线程的请求
   bool mbResetRequested;
 
-  // 和复位当前线程相关的互斥量
-  std::mutex mMutexReset;
-
-  /**
-   * @brief 当前线程调用,查看是否有外部线程请求当前线程'
-   *
-   */
-  bool CheckFinish();
-
-  /**
-   * @brief 有当前线程调用,执行完成该函数之后线程主函数退出,线程销毁
-   *
-   */
-  void SetFinish();
-
   // 是否有终止当前线程的请求
   bool mbFinishRequested;
 
-  // 当前线程是否已经停止工作
+  // 当前线程是否已经停止工作（由外部线程调用isFinished()读取）
   bool mbFinished;
-
-  // 和当前线程终止状态操作有关的互斥量
-  std::mutex mMutexFinish;
 
   // (全局)地图的指针
   Map* mpMap;
@@ -266,17 +241,12 @@ protected:
   // 全局BA线程是否在进行
   bool mbRunningGBA;
 
-  // 全局BA线程在收到停止请求之后是否停止的比标志，表示全局BA工作是否正常结束?
-  bool mbFinishedGBA;
-
   // 由当前线程调用,请求停止当前正在进行的全局BA
+  // （全局BA内部会检测这一项，但是他不一定真的能停下来）
   bool mbStopGBA;
 
-  // 在对和全局线程标志量有关的操作的时候使用的互斥量
-  std::mutex mMutexGBA;
-
   // 全局BA线程句柄
-  std::thread* mpThreadGBA;
+  std::thread mThreadGBA;
 
   // 已经进行了的全局BA次数(包含中途被打断的)
   size_t mnFullBAIdx;

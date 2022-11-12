@@ -250,7 +250,7 @@ Tracking::trackImageWithPose(const cv::Mat &im,
     // 地图更新时加锁，保证地图不会发生变化。
     // 这样子会不会影响地图的实时更新?
     // 主要耗时在构造帧中特征点的提取和匹配部分,在那个时候地图是没有被上锁的,有足够的时间更新地图
-    unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
+    unique_lock<mutex> lock(mpMap->mMutexUpdateMap);
 
     if(mState==NOT_INITIALIZED)
     {
@@ -644,7 +644,7 @@ bool Tracking::TrackLocalMap()
     if(mCurrentFrame.mvpMapPoints[i])
     {
       // 由于当前帧的地图点可以被当前帧观测到，其被观测统计量加1
-      mCurrentFrame.mvpMapPoints[i]->IncreaseFound();
+      mCurrentFrame.mvpMapPoints[i]->IncreaseMatched();
       // 如果该地图点被相机观测数目nObs大于0，匹配内点计数+1
       // nObs： 被观测到的相机数目，单目+1，双目或RGB-D则+2
       if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
@@ -684,7 +684,7 @@ bool Tracking::NeedNewKeyFrame()
 
   // If Local Mapping is freezed by a Loop Closure do not insert keyframes
   // Step 2：如果局部地图线程被闭环检测使用，则不插入关键帧
-  if(mpLocalMapper->isStopped() || mpLocalMapper->stopRequested())
+  if(mpLocalMapper->isStopped() || mpLocalMapper->isStopRequested())
     return false;
 
   // 获取当前地图中的关键帧数目
@@ -738,7 +738,7 @@ bool Tracking::NeedNewKeyFrame()
     }
     else
     {
-      mpLocalMapper->InterruptBA();
+      mpLocalMapper->InterruptLocalBA();
       // 对于单目情况,就直接无法插入关键帧了
       // 为什么这里对单目情况的处理不一样? 可能是单目关键帧相对比较密集
       return false;
@@ -760,7 +760,7 @@ bool Tracking::NeedNewKeyFrame()
 void Tracking::CreateNewKeyFrame()
 {
   // 如果局部建图线程关闭了,就无法插入关键帧
-  if(!mpLocalMapper->SetNotStop(true))
+  if(mpLocalMapper->isStopped())
     return;
 
   // Step 1：将当前帧构造成关键帧
@@ -774,9 +774,6 @@ void Tracking::CreateNewKeyFrame()
   // Step 4：插入关键帧
   // 关键帧插入到列表 mlNewKeyFrames中，等待local mapping线程临幸
   mpLocalMapper->InsertKeyFrame(pKF);
-
-  // 插入好了，允许局部建图停止
-  mpLocalMapper->SetNotStop(false);
 
   // 当前帧成为新的关键帧，更新
   mnLastKeyFrameId = mCurrentFrame.mnId;
@@ -1015,11 +1012,9 @@ void Tracking::Reset()
 
   if(mpViewer)
   {
-    mpViewer->RequestStop();
-    while(!mpViewer->isStopped())
-      std::this_thread::sleep_for(std::chrono::milliseconds(3));
+    mpViewer->RequestReset();
+    LOG(INFO) << "System Reseting" << '\n';
   }
-  LOG(INFO) << "System Reseting" << '\n';
 
   // Reset Local Mapping
   LOG(INFO) << "Reseting Local Mapper...";
@@ -1039,19 +1034,21 @@ void Tracking::Reset()
   // Clear Map (this erase MapPoints and KeyFrames)
   mpMap->clear();
 
-  //然后复位各种变量
+  // 然后复位各种变量
   KeyFrame::nNextId = 0;
   Frame::nNextId = 0;
   mState = NO_IMAGES_YET;
-
   if(mpInitializer)
   {
     delete mpInitializer;
     mpInitializer = nullptr;
   }
 
-  if(mpViewer)
-    mpViewer->Release();
+  // 渲染器重新渲染
+  if (mpViewer)
+  {
+    mpViewer->RequestResetOver();
+  }
 }
 
 

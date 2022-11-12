@@ -50,9 +50,8 @@ LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc):
   mpMatchedKF(nullptr),
   mLastCorrectLoopKFid(0),
   mbRunningGBA(false),
-  mbFinishedGBA(true),
   mbStopGBA(false),
-  mpThreadGBA(nullptr),
+  mThreadGBA(),
   mnFullBAIdx(0),
   mpTracker(nullptr),
   mpLocalMapper(nullptr),
@@ -80,7 +79,7 @@ void LoopClosing::Run()
   mbFinished =false;
 
   // 线程主循环
-  while(1)
+  while(!mbFinishRequested)
   {
     // Loopclosing 中的关键帧是 LocalMapping 发送过来的，LocalMapping 是 Tracking 中发过来的
     // 在LocalMapping中通过 InsertKeyFrame 将关键帧插入闭环检测队列 mlpLoopKeyFrameQueue
@@ -89,17 +88,13 @@ void LoopClosing::Run()
       CorrectLoop();
 
     // 查看是否有外部线程请求复位当前线程
-    ResetIfRequested();
-
-    // 查看外部线程是否有终止当前线程的请求,如果有的话就跳出这个线程的主函数的主循环
-    if(CheckFinish())
-      break;
+    TryResetIfRequested();
 
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
 
   // 运行到这里说明有外部线程请求终止当前线程,在这个函数中执行终止当前线程的一些操作
-  SetFinish();
+  mbFinished = true;
 }
 
 // 将某个关键帧加入到回环检测的过程中,由局部建图线程调用
@@ -483,16 +478,10 @@ void LoopClosing::CorrectLoop()
   if(isRunningGBA())
   {
     // 如果有全局BA在运行，终止掉，迎接新的全局BA
-    unique_lock<mutex> lock(mMutexGBA);
     mbStopGBA = true;
-    // 记录全局BA次数
-    mnFullBAIdx++;
-    if(mpThreadGBA)
-    {
-      // 停止全局BA线程
-      mpThreadGBA->detach();
-      delete mpThreadGBA;
-    }
+    mnFullBAIdx++; // 记录全局BA次数
+    // 设置mbStopGBA后，GBA线程/函数不一定真的可以停下来，此处等待结果
+    mThreadGBA.join();
   }
 
   // 一直等到局部地图线程结束再继续
@@ -521,7 +510,7 @@ void LoopClosing::CorrectLoop()
   {
     // Get Map Mutex
     // 锁定地图点
-    unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
+    unique_lock<mutex> lock(mpMap->mMutexUpdateMap);
 
     // Step 2.1：通过mg2oScw（认为是准的）来进行位姿传播，得到当前关键帧的共视关键帧的世界坐标系下Sim3 位姿
     // 遍历"当前关键帧组""
@@ -677,12 +666,14 @@ void LoopClosing::CorrectLoop()
   // Step 8：新建一个线程用于全局BA优化
   // OptimizeEssentialGraph 只是优化了一些主要关键帧的位姿，这里进行全局BA可以全局优化所有位姿和MapPoints
   mbRunningGBA = true;
-  mbFinishedGBA = false;
   mbStopGBA = false;
-  mpThreadGBA = new thread(&LoopClosing::RunGlobalBundleAdjustment,this,mpCurrentKF->mnId);
+  {
+    std::thread threadGBA(&LoopClosing::RunGlobalBundleAdjustment,this,mpCurrentKF->mnId);
+    mThreadGBA.swap(threadGBA);
+  }
 
-  // Loop closed. Release Local Mapping.
-  mpLocalMapper->Release();
+  // Loop closed. ClearRequestStop Local Mapping.
+  mpLocalMapper->ClearRequestStop();
   LOG(INFO) << "Loop Closed!" << '\n';
   mLastCorrectLoopKFid = mpCurrentKF->mnId;
 }
@@ -717,7 +708,7 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
 
     // Get Map Mutex
     // 之所以不在上面 Fuse 函数中进行地图点融合更新的原因是需要对地图加锁
-    unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
+    unique_lock<mutex> lock(mpMap->mMutexUpdateMap);
     const int nLP = mvpLoopMapPoints.size();
     // Step 3 遍历闭环帧组的所有的地图点，替换掉需要替换的地图点
     for(int i=0; i<nLP;i++)
@@ -736,36 +727,21 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
 // 由外部线程调用,请求复位当前线程
 void LoopClosing::RequestReset()
 {
-  // 标志置位
-  {
-    unique_lock<mutex> lock(mMutexReset);
-    mbResetRequested = true;
-  }
-
-  // 堵塞,直到回环检测线程复位完成
-  while(1)
-  {
-    {
-      unique_lock<mutex> lock(mMutexReset);
-      if(!mbResetRequested)
-        break;
-    }
-    //usleep(5000);
+  mbResetRequested = true;
+  // 堵塞当前线程，直到回环检测线程复位完成
+  while(mbResetRequested)
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
-
-  }
 }
 
 // 当前线程调用,检查是否有外部线程请求复位当前线程,如果有的话就复位回环检测线程
-void LoopClosing::ResetIfRequested()
+void LoopClosing::TryResetIfRequested()
 {
-  unique_lock<mutex> lock(mMutexReset);
   // 如果有来自于外部的线程的复位请求,那么就复位当前线程
   if(mbResetRequested)
   {
-    mlpLoopKeyFrameQueue.clear();   // 清空参与和进行回环检测的关键帧队列
-    mLastCorrectLoopKFid=0;                // 上一次没有和任何关键帧形成闭环关系
-    mbResetRequested=false;         // 复位请求标志复位
+    mlpLoopKeyFrameQueue.clear(); // 清空参与和进行回环检测的关键帧队列
+    mLastCorrectLoopKFid = 0;     // 上一次没有和任何关键帧形成闭环关系
+    mbResetRequested = false;     // 复位请求标志复位
   }
 }
 
@@ -799,7 +775,6 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
   // 在global BA过程中local mapping线程仍然在工作，这意味着在global BA时可能有新的关键帧产生，但是并未包括在GBA里，
   // 所以和更新后的地图并不连续。需要通过spanning tree来传播
   {
-    unique_lock<mutex> lock(mMutexGBA);
     // 如果全局BA过程是因为意外结束的,那么直接退出GBA
     if(idx!=mnFullBAIdx)
       return;
@@ -825,8 +800,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 
       // Get Map Mutex
       // 后续要更新地图所以要上锁
-      // todo: 解决可能的死锁问题
-      unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
+      unique_lock<mutex> lock(mpMap->mMutexUpdateMap);
 
       // Correct keyframes starting at map first keyframe
       // 从第一个关键帧开始矫正关键帧。刚开始只保存了初始化第一个关键帧
@@ -910,12 +884,11 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
       }
 
       // 释放
-      mpLocalMapper->Release();
+      mpLocalMapper->ClearRequestStop();
 
       LOG(INFO) << "Map updated!" << '\n';
     }
 
-    mbFinishedGBA = true;
     mbRunningGBA = false;
   }
 }
@@ -923,28 +896,12 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 // 由外部线程调用,请求终止当前线程
 void LoopClosing::RequestFinish()
 {
-  unique_lock<mutex> lock(mMutexFinish);
   mbFinishRequested = true;
-}
-
-// 当前线程调用,查看是否有外部线程请求当前线程
-bool LoopClosing::CheckFinish()
-{
-  unique_lock<mutex> lock(mMutexFinish);
-  return mbFinishRequested;
-}
-
-// 有当前线程调用,执行完成该函数之后线程主函数退出,线程销毁
-void LoopClosing::SetFinish()
-{
-  unique_lock<mutex> lock(mMutexFinish);
-  mbFinished = true;
 }
 
 // 由外部线程调用,判断当前回环检测线程是否已经正确终止了
 bool LoopClosing::isFinished()
 {
-  unique_lock<mutex> lock(mMutexFinish);
   return mbFinished;
 }
 

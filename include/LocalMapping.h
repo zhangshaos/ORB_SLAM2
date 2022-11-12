@@ -72,30 +72,22 @@ public:
      */
     void InsertKeyFrame(KeyFrame* pKF);
 
-    // Thread Synch
-    // 外部线程调用,请求停止当前线程的工作
+    // 由LoopClosing线程调用，请求暂停当前建图线程的工作，
+    // 用来卡住当前关键帧的数量，然后做GBA优化
     void RequestStop();
 
-    // 请求当前线程复位,由外部线程调用,堵塞的
-    void RequestReset();
-
-    /**
-     * @brief 检查是否要把当前的局部建图线程停止,
-     * 如果当前线程没有那么检查请求标志,如果请求标志被置位那么就设置为停止工作.
-     * 由run函数调用
-     * @return true 
-     * @return false 
-     */
-    bool Stop();
-
-    // 释放当前还在缓冲区中的关键帧指针
-    void Release();
+    // 由LoopClosing线程调用，撤销RequestStop()的请求，
+    // 允许建图线程继续工作
+    void ClearRequestStop();
 
     // 检查mbStopped是否被置位了
     bool isStopped();
 
     // 是否有终止当前线程的请求
-    bool stopRequested();
+    bool isStopRequested();
+
+    // 请求当前线程复位,由外部线程调用,堵塞的
+    void RequestReset();
 
     // 查看当前是否允许接受关键帧
     bool AcceptKeyFrames();
@@ -104,14 +96,9 @@ public:
     void SetAcceptKeyFrames(bool flag);
 
     /**
-     * @brief 设置 mbnotStop标志的状态
-     */
-    bool SetNotStop(bool flag);
-
-    /**
      * @brief 外部线程调用,终止BA
      */
-    void InterruptBA();
+    void InterruptLocalBA();
 
     /**
      * @brief 请求终止当前线程
@@ -192,28 +179,14 @@ protected:
     static cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
 
     // 检查当前是否有复位线程的请求
-    void ResetIfRequested();
+    void TryResetIfRequested();
     // 当前系统是否收到了请求复位的信号
     bool mbResetRequested;
-    // 和复位信号有关的互斥量
-    std::mutex mMutexReset;
-
-    /**
-     * @brief 检查是否已经有外部线程请求终止当前线程
-     */
-    bool CheckFinish();
-
-    /**
-     * @brief 设置当前线程已经真正地结束了,由本线程run函数调用
-     */
-    void SetFinish();
 
     // 当前线程是否收到了请求终止的信号
     bool mbFinishRequested;
     // 当前线程的主函数是否已经终止
     bool mbFinished;
-    // 和"线程真正结束"有关的互斥锁
-    std::mutex mMutexFinish;
 
     // 指向局部地图的句柄
     Map* mpMap;
@@ -230,27 +203,22 @@ protected:
 
     // 存储当前关键帧生成的地图点,也是等待检查的地图点列表
     std::list<MapPoint*> mlpRecentAddedMapPoints;
-
     // 操作关键帧列表时使用的互斥量
     std::mutex mMutexNewKFs;
 
-    // 终止BA的标志
-    bool mbAbortBA;
+    // 终止LocalBA的标志
+    // 因为LocalBA优化太耗时了，因此InsertKeyFrame()、InterruptLocalBA()、RequestStop()这些函数
+    // 都会设置此项为帧，使得LBA尽快结束，建图线程去干别的事情
+    bool mbAbortLocalBARequested;
 
-    // 当前线程是否已经真正地终止了
+    // 当前线程是否已经停止
+    // 因为回环检测线程调避免在进行全局优化的过程中局部建图线程添加新的关键帧，需要让建图线程停止
     bool mbStopped;
-    // 终止当前线程的请求
+    // 终止当前线程的请求，通常只由回环线程写，因此不需要加锁
     bool mbStopRequested;
-    // 标志这当前线程还不能够停止工作,优先级比那个 "mbStopRequested" 要高.
-    // 只有这个和 mbStopRequested 都满足要求的时候,线程才会进行一系列的终止操作
-    bool mbNotStop;
-    // 和终止线程相关的互斥锁
-    std::mutex mMutexStop;
 
     // 当前局部建图线程是否允许关键帧输入
     bool mbAcceptKeyFrames;
-    // 和操作上面这个变量有关的互斥量
-    std::mutex mMutexAccept;
 };
 
 } //namespace ORB_SLAM

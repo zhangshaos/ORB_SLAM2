@@ -171,19 +171,19 @@ public:
    * @param[in] n 增加的个数
    * @see Tracking::TrackLocalMap()
    */
-  void IncreaseFound(int n=1);
+  void IncreaseMatched(int n=1);
 
-  //? 这个比例是?
-  float GetFoundRatio();
+  // 地图点匹配到帧特征点的次数/被帧看到的次数
+  float GetMatchedRatio();
 
   /**
    * @brief 获取被找到的次数
    *
    * @return int 被找到的次数
    */
-  inline int GetFound()
+  inline int GetNumMatched()
   {
-    return mnFound;
+    return mnMatched;
   }
 
   /**
@@ -289,8 +289,8 @@ protected:
   KeyFrame* mpRefKF;
 
   // Tracking counters
-  int mnVisible;
-  int mnFound;
+  int mnVisible; //< 该地图点被帧观测到的次数
+  int mnMatched; //< 该地图点匹配到帧特征点的次数
 
   // Bad flag (we do not currently erase MapPoint from memory)
   bool mbBad;

@@ -597,7 +597,7 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
   }
 
   // Get Map Mutex
-  unique_lock<mutex> lock(pMap->mMutexMapUpdate);
+  unique_lock<mutex> lock(pMap->mMutexUpdateMap);
 
   // 删除点
   // 连接偏差比较大，在关键帧中剔除对该地图点的观测
@@ -899,7 +899,7 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
   optimizer.optimize(20);
 
   // 更新地图前，先上锁，防止冲突
-  unique_lock<mutex> lock(pMap->mMutexMapUpdate);
+  unique_lock<mutex> lock(pMap->mMutexUpdateMap);
 
   // SE3 Pose Recovering. Sim3:[sR t;0 1] -> SE3:[R t/s;0 1]
   // Step 6：将优化后的位姿更新到关键帧中
