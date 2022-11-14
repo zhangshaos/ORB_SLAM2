@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.12)
 project(ORB_SLAM2)
 
+# Pre-compile other static library firstly.
+add_subdirectory(Thirdparty/DBoW2)
+add_subdirectory(Thirdparty/g2o)
+
+# Compile ORB_SLAM2 secondly.
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE RelWithDebInfo)
+  set(CMAKE_BUILD_TYPE Release)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
