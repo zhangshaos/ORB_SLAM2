@@ -11,11 +11,11 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+if(MSVC)
+    add_compile_options(/bigobj /MP /utf-8)
+endif()
 set(CMAKE_CXX_STANDARD 17) # check c++11
 add_definitions(-DCOMPILEDWITHC11)
-if(MSVC)
-   add_compile_options(/bigobj /MP /utf-8)
-endif()
 
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -63,8 +63,10 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         ${OpenCV_LIBS}
         ${EIGEN3_LIBS}
         ${Pangolin_LIBRARIES}
-        ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/DBoW2.lib
-        ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/g2o.lib
+        DBoW2
+        g2o
+        #${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/DBoW2.lib
+        #${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/g2o.lib
         glog::glog
         tomlplusplus::tomlplusplus
         fmt::fmt

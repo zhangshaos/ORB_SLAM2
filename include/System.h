@@ -29,24 +29,30 @@
 #include <opencv2/core/core.hpp>
 #include <sophus/geometry.hpp>
 
+#include "ORBVocabulary.h"
+
 
 namespace ORB_SLAM2
 {
 
 // 要用到的其他类的前视声明
-class Viewer;
-class FrameDrawer;
-class Map;
-class Tracking;
-class LocalMapping;
-class LoopClosing;
+  class Viewer;
+  class FrameDrawer;
+  class MapPoint;
+  class Map;
+  class Tracking;
+  class LocalMapping;
+  class LoopClosing;
+  class KeyFrameDatabase;
+  class MapDrawer;
+
 
 //本类的定义
-class System
-{
-public:
-    System(const string &strVocFile,            //指定ORB字典文件的路径
-           const string &strSettingsFile,       //指定配置文件的路径
+  class System
+  {
+  public:
+    System(const std::string &strVocFile,            //指定ORB字典文件的路径
+           const std::string &strSettingsFile,       //指定配置文件的路径
            bool bUseViewer = true);       //指定是否使用可视化界面
 
     ~System();
@@ -83,7 +89,7 @@ public:
      * @param revertTransform[in]   将ORB_SLAM2世界地图点转换为真实世界地图点，默认为空
      * @return
      */
-    bool SaveMap(const string &filename, const Sophus::SE3d *revertTransform=nullptr);
+    bool SaveMap(const std::string &filename, const Sophus::SE3d *revertTransform=nullptr);
     // bool LoadMap(const string &filename);
 
     // 获取最近的运动追踪状态、地图点追踪状态、特征点追踪状态
@@ -94,7 +100,7 @@ public:
     // 保存最近成功追踪到的地图点
     bool SaveTrackedMap(const std::string &filePath);
 
-protected:
+  protected:
     // 注意变量命名方式，类的变量有前缀m，如果这个变量是指针类型还要多加个前缀p，
     // 如果是线程那么加个前缀t
 
@@ -156,7 +162,7 @@ protected:
     cv::Mat mInImage;
     // 存储当前输入图片文件名
     std::string mInImageName;
-};
+  };
 
 }// namespace ORB_SLAM
 
