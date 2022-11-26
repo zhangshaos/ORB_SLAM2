@@ -94,6 +94,9 @@ std::vector<Sophus::SE3d> loadCamerasPose(const std::string &filepath, Sophus::S
   }
   if (revertTransform)
     *revertTransform = Tow.inverse();
+    // 由于UE4使用左手系，因此需要对从UE4导出的模型进行MeshLab处理：
+    // 法向Y轴，交换X-Z轴
+    // 之后模型和SLAM系统导出的点才可以对齐
   return Tco_s;
 }
 
@@ -126,6 +129,8 @@ int Main(int argc, char* argv[])
   ORB_SLAM2::System slamSystem(args["FBoWVocabularyPath"].ref<std::string>(),
                                args["ORBSLAMConfigPath"].ref<std::string>(),
                                true);
+  slamSystem.SetRealTransform(revertM);
+
   // Main loop
   double timeStamp = 0.0;
   for(size_t i=0, iend=imagesFilename.size(); i < iend; ++i)
@@ -145,7 +150,7 @@ int Main(int argc, char* argv[])
     // Compute the depth of each tracked key points.
     if (trackState == ORB_SLAM2::Tracking::State::OK)
     {
-      const std::string trackedFilePrefix = "../../Examples/Monocular/Out";
+      const std::string trackedFilePrefix = "../Examples/Monocular/Out";
       const std::string trackedFilename = fmt::format("{}/trackPoints{}.ply", trackedFilePrefix, i);
       slamSystem.SaveTrackedMap(trackedFilename);
     }
@@ -154,7 +159,7 @@ int Main(int argc, char* argv[])
   std::cin.get();
   // Stop all threads
   slamSystem.Shutdown();
-  slamSystem.SaveMap("../../Examples/Monocular/Out/Map.ply", &revertM);
+  slamSystem.SaveMap("../Examples/Monocular/Out/Map.ply");
   LOG(INFO) << "Corrected Exit!";
   return 0;
 }
