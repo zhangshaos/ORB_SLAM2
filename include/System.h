@@ -86,10 +86,9 @@ namespace ORB_SLAM2
      * 保存整个地图。
      *
      * @param filename[in]          保存文件路径（文件名）
-     * @param revertTransform[in]   将ORB_SLAM2世界地图点转换为真实世界地图点，默认为空
      * @return
      */
-    bool SaveMap(const std::string &filename, const Sophus::SE3d *revertTransform=nullptr);
+    bool SaveMap(const std::string &filename);
     // bool LoadMap(const string &filename);
 
     // 获取最近的运动追踪状态、地图点追踪状态、特征点追踪状态
@@ -97,8 +96,14 @@ namespace ORB_SLAM2
     std::vector<MapPoint*> GetTrackedMapPoints();
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
 
-    // 保存最近成功追踪到的地图点
+    // 保存最近成功追踪到的地图点，以及位姿等信息
     bool SaveTrackedMap(const std::string &filePath);
+
+    // @see mRealTransform for details
+    void SetRealTransform(const Sophus::SE3d& transform)
+    {
+      mRealTransform = transform;
+    }
 
   protected:
     // 注意变量命名方式，类的变量有前缀m，如果这个变量是指针类型还要多加个前缀p，
@@ -162,6 +167,10 @@ namespace ORB_SLAM2
     cv::Mat mInImage;
     // 存储当前输入图片文件名
     std::string mInImageName;
+
+    // SLAM系统的世界坐标系实际上是以第一帧相机朝向构建的相机坐标系：前z，右x，下y
+    // 为了得到真实世界的坐标，还需要一个变换矩阵，即第一帧相机在真实世界上的位姿
+    Sophus::SE3d mRealTransform{ Sophus::Matrix4d::Identity() };
   };
 
 }// namespace ORB_SLAM

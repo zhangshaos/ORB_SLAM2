@@ -209,7 +209,7 @@ vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
     return mTrackedKeyPointsUn;
 }
 
-bool System::SaveMap(const string &filename, const Sophus::SE3d *revertTransform)
+bool System::SaveMap(const string &filename)
 {
   auto mapPoints = mpMap->GetAllMapPoints();
   if (mapPoints.empty())
@@ -221,14 +221,11 @@ bool System::SaveMap(const string &filename, const Sophus::SE3d *revertTransform
     {
       cv::Mat wPos = p->GetWorldPos();
       double x = wPos.at<float>(0), y = wPos.at<float>(1), z = wPos.at<float>(2);
-      if (revertTransform)
-      {
-        Eigen::Vector3d eigenWPos{x, y, z};
-        eigenWPos = (*revertTransform) * eigenWPos;
-        x = eigenWPos.x();
-        y = eigenWPos.y();
-        z = eigenWPos.z();
-      }
+      Eigen::Vector3d eigenWPos{x, y, z};
+      eigenWPos = mRealTransform * eigenWPos;
+      x = eigenWPos.x();
+      y = eigenWPos.y();
+      z = eigenWPos.z();
       vertexesPosition.emplace_back(std::array<double,3>{x, y, z});
     }
   plyFile.addVertexPositions(vertexesPosition);
@@ -299,6 +296,22 @@ bool System::SaveTrackedMap(const std::string &filePath)
   const size_t M = vertexesPos.size();
   if (M <= 0)
     return false;
+  // 写入当前帧信息
+  uint32_t fID = mpTracker->mCurrentFrame.mnId;
+  cv::Mat Tcw = mpTracker->mCurrentFrame.mTcw * Converter::toCvMat(mRealTransform.inverse());
+  std::vector<float> TcwParams;
+  for (int i=0; i<Tcw.rows; ++i)
+    for (int j=0; j<Tcw.cols; ++j)
+      TcwParams.emplace_back(Tcw.at<float>(i, j));
+  const auto& K = mpTracker->mCurrentFrame.mK;
+  std::vector<float> KParams;
+  for (int i=0; i<K.rows; ++i)
+    for (int j=0; j<K.cols; ++j)
+      KParams.emplace_back(K.at<float>(i, j));
+  plyFile.addElement("frame", 1);
+  plyFile.getElement("frame").addProperty<uint32_t>("ID", {fID});
+  plyFile.getElement("frame").addListProperty<float>("Tcw", {TcwParams});
+  plyFile.getElement("frame").addListProperty<float>("K", {KParams});
   plyFile.addVertexPositions(vertexesPos);
   plyFile.addVertexColors(vertexesColor);
   plyFile.getElement("vertex").addProperty<float>("ix", vertexesPtX);
