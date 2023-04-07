@@ -75,6 +75,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 ###################
 # Build examples  #
 ###################
+set(BUILD_EXAMPLE FALSE)
+if(BUILD_EXAMPLE)
 add_executable(mono_shenzhen Examples/Monocular/mono_shenzhen.cc)
 target_link_libraries(mono_shenzhen ${PROJECT_NAME})
-
+endif()
